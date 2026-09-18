@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { DatosAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
+import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Saldo } from '../lib/tipos'
@@ -34,14 +36,16 @@ export function DetallePersona({
   saldo: s,
   onVolver,
   onCambio,
+  mostrar,
 }: {
   saldo: Saldo
   onVolver: () => void
-  onCambio: () => void
+  onCambio: () => Promise<void>
+  mostrar: (aviso: DatosAviso) => void
 }) {
   const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null)
+  const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [confirmando, setConfirmando] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     const desde = new Date(Date.now() - DIAS_DE_HISTORIAL * 86_400_000).toISOString().slice(0, 10)
@@ -58,9 +62,10 @@ export function DetallePersona({
         .gte('fecha', desde),
     ])
     if (compras.error || pagos.error) {
-      setError('No se pudo cargar el historial.')
+      setErrorDeCarga(true)
       return
     }
+    setErrorDeCarga(false)
     setMovimientos(
       [
         ...compras.data.map((c): Movimiento => ({
@@ -91,29 +96,44 @@ export function DetallePersona({
     cargar()
   }, [cargar])
 
+  async function cambiarAnulado(m: Movimiento, anulado: boolean): Promise<boolean> {
+    const cambio = m.tabla === 'compras' ? { anulada: anulado } : { anulado }
+    const { error } = await supabase.from(m.tabla).update(cambio).eq('id', m.id)
+    await Promise.all([cargar(), onCambio()])
+    return !error
+  }
+
   async function anular(m: Movimiento) {
     setConfirmando(null)
-    const cambio = m.tabla === 'compras' ? { anulada: true } : { anulado: true }
-    const { error } = await supabase.from(m.tabla).update(cambio).eq('id', m.id)
-    if (error) setError('No se pudo anular. Revisa la conexión.')
-    await cargar()
-    onCambio()
+    const que = m.tabla === 'pagos' ? 'el pago' : 'la compra'
+    if (!(await cambiarAnulado(m, true))) {
+      mostrar({ tipo: 'error', texto: 'No se pudo anular. Revisa el internet.' })
+      return
+    }
+    mostrar({
+      tipo: 'ok',
+      texto: `Se anuló ${que}: ${m.texto}, ${formatearPesos(m.valor)}`,
+      deshacer: async () => {
+        if (await cambiarAnulado(m, false)) mostrar({ tipo: 'ok', texto: `Se recuperó ${que}.` })
+        else mostrar({ tipo: 'error', texto: 'No se pudo deshacer. Revisa el internet.' })
+      },
+    })
   }
 
   const aFavor = s.saldo < 0
 
   return (
-    <section className="flex flex-col gap-6">
-      <Boton variante="secundario" className="self-start" onClick={onVolver}>
-        Volver a la lista
+    <section className="flex flex-col gap-5">
+      <Boton variante="texto" className="-ml-3 self-start" onClick={onVolver}>
+        <span aria-hidden="true">‹ </span>Volver a Cobrar
       </Boton>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <h1 className="text-3xl font-bold">{s.nombre}</h1>
-          <p className="text-xl text-stone-500">{s.departamento}</p>
+          <h1 className="text-titulo font-bold">{s.nombre}</h1>
+          <p className="text-lg text-stone-600">{s.departamento}</p>
         </div>
-        <p className={`text-3xl font-bold ${aFavor ? 'text-green-800' : ''}`}>
+        <p className={`text-3xl font-bold tabular-nums ${aFavor || s.saldo === 0 ? 'text-green-800' : ''}`}>
           {aFavor
             ? `A favor ${formatearPesos(-s.saldo)}`
             : s.saldo === 0
@@ -122,48 +142,61 @@ export function DetallePersona({
         </p>
       </div>
 
-      {error && <p className="text-lg text-red-800">{error}</p>}
-      {movimientos === null && !error && <p className="text-lg text-stone-500">Cargando...</p>}
+      {errorDeCarga && <ErrorDeCarga texto="No se pudo cargar el historial." onReintentar={cargar} />}
+      {movimientos === null && !errorDeCarga && <p className="text-lg text-stone-600">Cargando...</p>}
       {movimientos?.length === 0 && (
         <p className="text-lg text-stone-600">No hay movimientos en los últimos {DIAS_DE_HISTORIAL} días.</p>
       )}
 
-      <ul className="flex flex-col gap-2">
-        {movimientos?.map((m) => (
-          <li
-            key={m.clave}
-            className={`flex flex-wrap items-center gap-3 rounded-2xl border-2 bg-white p-4 ${
-              m.tabla === 'pagos' ? 'border-green-200' : 'border-stone-200'
-            } ${m.anulado ? 'opacity-50' : ''}`}
-          >
-            <div className={`min-w-0 flex-1 ${m.anulado ? 'line-through' : ''}`}>
-              <p className={`text-xl ${m.tabla === 'pagos' ? 'font-semibold text-green-900' : ''}`}>{m.texto}</p>
-              <p className="text-base text-stone-500">{fechaCorta(m.fecha)}</p>
-            </div>
-            <span className={`text-xl font-semibold ${m.tabla === 'pagos' ? 'text-green-900' : ''}`}>
-              {m.tabla === 'pagos' ? '-' : ''}
-              {formatearPesos(m.valor)}
-            </span>
-            {m.anulado && <span className="text-base text-stone-500">Anulado</span>}
-            {!m.anulado && confirmando !== m.clave && (
-              <Boton variante="peligro" onClick={() => setConfirmando(m.clave)}>
-                Anular
-              </Boton>
-            )}
-            {confirmando === m.clave && (
-              <div className="flex w-full items-center justify-end gap-3">
-                <span className="text-lg">¿Anular {m.tabla === 'pagos' ? 'este pago' : 'esta compra'}?</span>
-                <Boton variante="peligro" onClick={() => anular(m)}>
-                  Sí, anular
-                </Boton>
-                <Boton variante="secundario" onClick={() => setConfirmando(null)}>
-                  No
-                </Boton>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      {movimientos && movimientos.length > 0 && (
+        <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+          {movimientos.map((m) => {
+            const esPago = m.tabla === 'pagos'
+            return (
+              <li key={m.clave}>
+                <div className="flex items-center gap-3 py-2 pr-3 pl-4">
+                  <div className={`min-w-0 flex-1 ${m.anulado ? 'text-stone-500 line-through' : ''}`}>
+                    <p className={`text-lg ${esPago && !m.anulado ? 'font-semibold text-green-800' : ''}`}>{m.texto}</p>
+                    <p className="text-base text-stone-600">{fechaCorta(m.fecha)}</p>
+                  </div>
+                  <span
+                    className={`text-lg font-semibold tabular-nums ${
+                      m.anulado ? 'text-stone-500 line-through' : esPago ? 'text-green-800' : ''
+                    }`}
+                  >
+                    {esPago ? '−' : ''}
+                    {formatearPesos(m.valor)}
+                  </span>
+                  {m.anulado ? (
+                    <span className="w-24 text-center text-base text-stone-600">Anulado</span>
+                  ) : (
+                    <Boton
+                      variante="peligro"
+                      compacto
+                      className="w-24"
+                      disabled={confirmando === m.clave}
+                      onClick={() => setConfirmando(m.clave)}
+                    >
+                      Anular
+                    </Boton>
+                  )}
+                </div>
+                {confirmando === m.clave && (
+                  <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-red-50 px-4 py-3">
+                    <span className="mr-auto text-lg">¿Anular {esPago ? 'este pago' : 'esta compra'}?</span>
+                    <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
+                      No
+                    </Boton>
+                    <Boton variante="peligro" compacto onClick={() => anular(m)}>
+                      Sí, anular
+                    </Boton>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }

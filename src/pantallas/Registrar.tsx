@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Aviso } from '../componentes/Aviso'
+import { useAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
+import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
+import { campo } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
 import { leerDictado } from '../lib/dictado'
 import { hora, hoyBogota } from '../lib/fechas'
@@ -7,8 +11,6 @@ import { normalizarNombre, resolverPersona, vocabulario } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Departamento, Perfil, Persona } from '../lib/tipos'
-
-const campo = 'min-h-14 w-full rounded-2xl border-2 border-stone-300 bg-white px-4'
 
 interface Borrador {
   textoOriginal: string
@@ -35,14 +37,26 @@ function soloDigitos(texto: string): string {
   return texto.replace(/\D/g, '').replace(/^0+/, '')
 }
 
-export function Registrar({ perfil }: { perfil: Perfil }) {
+export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
   const [departamentos, setDepartamentos] = useState<Departamento[] | null>(null)
+  const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [personas, setPersonas] = useState<Persona[]>([])
   const [texto, setTexto] = useState('')
   const [borrador, setBorrador] = useState<Borrador | null>(null)
-  const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
   const [hoy, setHoy] = useState<CompraDeHoy[]>([])
+  const { aviso, mostrar, cerrar } = useAviso()
   const entrada = useRef<HTMLInputElement>(null)
+  const puedeAnular = perfil.rol === 'admin' || perfil.rol === 'operador'
+
+  const cargarDepartamentos = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('departamentos')
+      .select('id, nombre, alias, activo')
+      .eq('activo', true)
+      .order('nombre')
+    setErrorDeCarga(error !== null)
+    if (data) setDepartamentos(data)
+  }, [])
 
   const cargarPersonas = useCallback(async () => {
     const { data } = await supabase
@@ -61,19 +75,13 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
     if (data) setHoy(data as unknown as CompraDeHoy[])
   }, [])
 
+  // Se recarga al volver a la pestaña: en Ajustes o en Cobrar pudo cambiar algo.
   useEffect(() => {
-    supabase
-      .from('departamentos')
-      .select('id, nombre, alias, activo')
-      .eq('activo', true)
-      .order('nombre')
-      .then(({ data, error }) => {
-        if (error) setAviso({ tipo: 'error', texto: 'No se pudieron cargar los departamentos.' })
-        else setDepartamentos(data)
-      })
+    if (!activa) return
+    cargarDepartamentos()
     cargarPersonas()
     cargarHoy()
-  }, [cargarPersonas, cargarHoy])
+  }, [activa, cargarDepartamentos, cargarPersonas, cargarHoy])
 
   function alEnviar(e: FormEvent) {
     e.preventDefault()
@@ -83,7 +91,7 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
   function leer(texto: string) {
     const frase = texto.trim()
     if (!frase || !departamentos) return
-    setAviso(null)
+    cerrar()
     const dictado = leerDictado(frase, departamentos)
     const resuelta = resolverPersona(dictado, personas)
     setBorrador({
@@ -103,27 +111,32 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
   }
 
   async function guardar(b: Borrador) {
-    setAviso(null)
+    cerrar()
     const personaId = b.personaId ?? (await crearPersona(b.nombreNuevo.trim(), b.departamentoId!))
     if (personaId === null) {
-      setAviso({ tipo: 'error', texto: 'No se pudo crear la persona. Revisa la conexión.' })
+      mostrar({ tipo: 'error', texto: 'No se pudo crear la persona. Revisa el internet e intenta otra vez.' })
       return
     }
-    const { error } = await supabase.from('compras').insert({
-      persona_id: personaId,
-      descripcion: b.descripcion.trim(),
-      valor_pesos: Number(b.valor),
-      texto_original: b.textoOriginal,
-    })
+    const { data, error } = await supabase
+      .from('compras')
+      .insert({
+        persona_id: personaId,
+        descripcion: b.descripcion.trim(),
+        valor_pesos: Number(b.valor),
+        texto_original: b.textoOriginal,
+      })
+      .select('id')
+      .single()
     if (error) {
-      setAviso({ tipo: 'error', texto: 'No se pudo guardar. Revisa la conexión e intenta de nuevo.' })
+      mostrar({ tipo: 'error', texto: 'No se pudo guardar. Revisa el internet e intenta otra vez.' })
       return
     }
     const persona = personas.find((p) => p.id === personaId)
     const nombre = persona?.nombre ?? b.nombreNuevo.trim()
-    setAviso({
+    mostrar({
       tipo: 'ok',
       texto: `Guardado: ${nombre}, ${b.descripcion.trim()}, ${formatearPesos(Number(b.valor))}`,
+      deshacer: puedeAnular ? () => cambiarAnulada(data.id, true, 'Se deshizo la compra.') : undefined,
     })
     setBorrador(null)
     setTexto('')
@@ -150,22 +163,41 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
     return existentes?.find((p) => normalizarNombre(p.nombre) === clave)?.id ?? null
   }
 
-  async function anular(id: number) {
-    const { error } = await supabase.from('compras').update({ anulada: true }).eq('id', id)
-    if (error) setAviso({ tipo: 'error', texto: 'No se pudo anular. Revisa la conexión.' })
-    cargarHoy()
+  async function cambiarAnulada(id: number, anulada: boolean, textoOk: string) {
+    const { error } = await supabase.from('compras').update({ anulada }).eq('id', id)
+    if (error) mostrar({ tipo: 'error', texto: 'No se pudo hacer el cambio. Revisa el internet.' })
+    else mostrar({ tipo: 'ok', texto: textoOk })
+    await cargarHoy()
+  }
+
+  async function anular(c: CompraDeHoy) {
+    const { error } = await supabase.from('compras').update({ anulada: true }).eq('id', c.id)
+    await cargarHoy()
+    if (error) {
+      mostrar({ tipo: 'error', texto: 'No se pudo anular. Revisa el internet.' })
+      return
+    }
+    mostrar({
+      tipo: 'ok',
+      texto: `Se anuló: ${c.personas?.nombre ?? ''}, ${c.descripcion}, ${formatearPesos(c.valor_pesos)}`,
+      deshacer: () => cambiarAnulada(c.id, false, 'Se recuperó la compra.'),
+    })
   }
 
   if (departamentos === null) {
-    return <p className="text-lg text-stone-500">{aviso?.texto ?? 'Cargando...'}</p>
+    return errorDeCarga ? (
+      <ErrorDeCarga texto="No se pudieron cargar los departamentos." onReintentar={cargarDepartamentos} />
+    ) : (
+      <p className="text-lg text-stone-600">Cargando...</p>
+    )
   }
 
   return (
-    <section className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold">Registrar</h1>
+    <section className="flex flex-col gap-5">
+      <h1 className="text-titulo font-bold">Registrar</h1>
 
       {departamentos.length === 0 && (
-        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900">
+        <p className="rounded-xl bg-amber-50 p-4 text-lg text-amber-900">
           Primero hay que crear los departamentos en Ajustes.
         </p>
       )}
@@ -181,17 +213,20 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
         />
       ) : (
         <form onSubmit={alEnviar} className="flex flex-col gap-3">
-          <Microfono
-            vocabulario={() => vocabulario(personas, departamentos)}
-            onTexto={(dicho) => {
-              setTexto(dicho)
-              leer(dicho)
-            }}
-            onError={(mensaje) => setAviso({ tipo: 'error', texto: mensaje })}
-            onEmpezar={() => setAviso(null)}
-          />
-          <label htmlFor="frase" className="text-lg text-stone-600">
-            O escríbelo: quién, departamento, qué y cuánto. Por ejemplo: Juan TDH almuerzo a 10 mil
+          {/* Solo en la pestaña visible, para que el micrófono no quede encendido. */}
+          {activa && (
+            <Microfono
+              vocabulario={() => vocabulario(personas, departamentos)}
+              onTexto={(dicho) => {
+                setTexto(dicho)
+                leer(dicho)
+              }}
+              onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+              onEmpezar={cerrar}
+            />
+          )}
+          <label htmlFor="frase" className="pt-1 text-base text-stone-600">
+            O escríbelo. Por ejemplo: Juan TDH almuerzo a 10 mil
           </label>
           <div className="flex gap-3">
             <input
@@ -201,35 +236,18 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
               onChange={(e) => setTexto(e.target.value)}
               autoComplete="off"
               enterKeyHint="go"
-              className={`${campo} flex-1 text-xl`}
+              className={`${campo} flex-1`}
             />
-            <button
-              type="submit"
-              disabled={!texto.trim()}
-              className="min-h-14 rounded-2xl bg-amber-800 px-6 font-semibold text-white active:bg-amber-900 disabled:bg-stone-400"
-            >
+            <Boton type="submit" disabled={!texto.trim()}>
               Seguir
-            </button>
+            </Boton>
           </div>
         </form>
       )}
 
-      {aviso && (
-        <p
-          role="status"
-          className={`rounded-2xl p-4 text-lg ${
-            aviso.tipo === 'ok' ? 'bg-green-50 text-green-900' : 'bg-red-50 text-red-800'
-          }`}
-        >
-          {aviso.texto}
-        </p>
-      )}
+      <ComprasDeHoy compras={hoy} puedeAnular={puedeAnular} onAnular={anular} />
 
-      <ComprasDeHoy
-        compras={hoy}
-        puedeAnular={perfil.rol === 'admin' || perfil.rol === 'operador'}
-        onAnular={anular}
-      />
+      <Aviso aviso={aviso} onCerrar={cerrar} />
     </section>
   )
 }
@@ -252,13 +270,21 @@ function Confirmacion({
   onCancelar: () => void
 }) {
   const [guardando, setGuardando] = useState(false)
+  // Con sugerencias, primero se muestran solo ellas; la persona nueva, si se pide.
+  const [otraPersona, setOtraPersona] = useState(false)
   const cambiar = (cambios: Partial<Borrador>) => onCambiar({ ...b, ...cambios })
   const nombreDepto = (id: number) => departamentos.find((d) => d.id === id)?.nombre ?? ''
   const elegida = personas.find((p) => p.id === b.personaId) ?? null
+  const personaNueva = elegida === null && (b.candidatas.length === 0 || otraPersona)
 
-  const personaLista = elegida !== null || (b.nombreNuevo.trim() !== '' && b.departamentoId !== null)
   const valor = Number(b.valor)
-  const listo = personaLista && b.descripcion.trim() !== '' && valor > 0
+  const faltan = [
+    !(elegida !== null || (personaNueva && b.nombreNuevo.trim() !== '' && b.departamentoId !== null)) &&
+      (personaNueva ? 'nombre y departamento' : 'elegir quién'),
+    b.descripcion.trim() === '' && 'qué compró',
+    !(valor > 0) && 'cuánto',
+  ].filter((f): f is string => typeof f === 'string')
+  const listo = faltan.length === 0
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
@@ -269,111 +295,118 @@ function Confirmacion({
   }
 
   return (
-    <form
-      onSubmit={guardar}
-      className="flex flex-col gap-6 rounded-3xl border-2 border-amber-700 bg-white p-5"
-    >
-      <p className="text-base text-stone-500">Se entendió: «{b.textoOriginal}»</p>
+    <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <p className="text-base text-stone-600">Se entendió: «{b.textoOriginal}»</p>
 
-      <div className="flex flex-col gap-3">
-        <span className="text-lg font-semibold">Quién</span>
+      <div className="flex flex-col gap-2">
+        <span className="text-base font-semibold text-stone-600">Quién</span>
         {elegida ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="flex-1 text-2xl font-bold">
+          <div className="flex items-center gap-3">
+            <p className="flex-1 text-xl font-semibold">
               {elegida.nombre}{' '}
-              <span className="font-normal text-stone-500">· {nombreDepto(elegida.departamento_id)}</span>
+              <span className="font-normal text-stone-600">· {nombreDepto(elegida.departamento_id)}</span>
             </p>
             <Boton
               variante="secundario"
+              compacto
               onClick={() => {
                 // Se ofrecen las que empiezan con el mismo nombre, además de crear una nueva.
                 const primer = normalizarNombre(elegida.nombre).split(' ')[0]
                 const parecidas = personas.filter((p) => normalizarNombre(p.nombre).split(' ')[0] === primer)
+                setOtraPersona(false)
                 cambiar({ personaId: null, candidatas: b.candidatas.length > 0 ? b.candidatas : parecidas })
               }}
             >
               Cambiar
             </Boton>
           </div>
+        ) : personaNueva ? (
+          <>
+            <p className="text-base text-stone-600">Persona nueva. Revisa el nombre y el departamento:</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                value={b.nombreNuevo}
+                onChange={(e) => cambiar({ nombreNuevo: e.target.value })}
+                placeholder="Nombre"
+                aria-label="Nombre de la persona nueva"
+                autoComplete="off"
+                className={campo}
+              />
+              <select
+                value={b.departamentoId ?? ''}
+                onChange={(e) => cambiar({ departamentoId: e.target.value ? Number(e.target.value) : null })}
+                aria-label="Departamento de la persona nueva"
+                className={campo}
+              >
+                <option value="">Elegir departamento...</option>
+                {departamentos.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {b.candidatas.length > 0 && (
+              <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setOtraPersona(false)}>
+                Volver a las personas sugeridas
+              </Boton>
+            )}
+          </>
         ) : (
           <>
-            {b.candidatas.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <p className="text-base text-stone-600">¿Es alguna de estas personas?</p>
-                {b.candidatas.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => cambiar({ personaId: p.id })}
-                    className="min-h-14 rounded-2xl border-2 border-stone-300 px-4 text-left text-xl active:bg-stone-100"
-                  >
-                    <span className="font-semibold">{p.nombre}</span>{' '}
-                    <span className="text-stone-500">· {nombreDepto(p.departamento_id)}</span>
-                  </button>
-                ))}
-                <p className="pt-2 text-base text-stone-600">Si no es ninguna, es una persona nueva:</p>
-              </div>
-            )}
-            {b.candidatas.length === 0 && (
-              <p className="text-base text-stone-600">Persona nueva. Revisa el nombre y el departamento:</p>
-            )}
-            <input
-              value={b.nombreNuevo}
-              onChange={(e) => cambiar({ nombreNuevo: e.target.value })}
-              placeholder="Nombre"
-              aria-label="Nombre de la persona nueva"
-              autoComplete="off"
-              className={`${campo} text-xl`}
-            />
-            <select
-              value={b.departamentoId ?? ''}
-              onChange={(e) => cambiar({ departamentoId: e.target.value ? Number(e.target.value) : null })}
-              aria-label="Departamento de la persona nueva"
-              className={`${campo} text-xl`}
-            >
-              <option value="">Elegir departamento...</option>
-              {departamentos.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.nombre}
-                </option>
+            <p className="text-base text-stone-600">¿Es alguna de estas personas?</p>
+            <div className="flex flex-col gap-2">
+              {b.candidatas.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => cambiar({ personaId: p.id })}
+                  className="min-h-12 rounded-xl border border-stone-300 px-4 text-left text-lg active:bg-stone-100"
+                >
+                  <span className="font-semibold">{p.nombre}</span>{' '}
+                  <span className="text-stone-600">· {nombreDepto(p.departamento_id)}</span>
+                </button>
               ))}
-            </select>
+            </div>
+            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setOtraPersona(true)}>
+              No es ninguna: es una persona nueva
+            </Boton>
           </>
         )}
       </div>
 
-      <label className="flex flex-col gap-2">
-        <span className="text-lg font-semibold">Qué</span>
-        <input
-          value={b.descripcion}
-          onChange={(e) => cambiar({ descripcion: e.target.value })}
-          autoComplete="off"
-          className={`${campo} text-xl`}
-        />
-      </label>
+      <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-stone-600">Qué</span>
+          <input
+            value={b.descripcion}
+            onChange={(e) => cambiar({ descripcion: e.target.value })}
+            autoComplete="off"
+            className={campo}
+          />
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-stone-600">Cuánto</span>
+          <input
+            value={b.valor}
+            onChange={(e) => cambiar({ valor: soloDigitos(e.target.value) })}
+            inputMode="numeric"
+            autoComplete="off"
+            className={`${campo} tabular-nums`}
+          />
+        </label>
+      </div>
 
-      <label className="flex flex-col gap-2">
-        <span className="text-lg font-semibold">Cuánto</span>
-        <input
-          value={b.valor}
-          onChange={(e) => cambiar({ valor: soloDigitos(e.target.value) })}
-          inputMode="numeric"
-          autoComplete="off"
-          className={`${campo} text-xl`}
-        />
-        {valor > 0 && <span className="text-2xl font-bold">{formatearPesos(valor)}</span>}
-      </label>
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
-          disabled={!listo || guardando}
-          className="min-h-16 flex-1 rounded-2xl bg-amber-800 px-8 text-xl font-bold text-white active:bg-amber-900 disabled:bg-stone-400"
-        >
-          {guardando ? 'Guardando...' : 'Guardar'}
-        </button>
-        <Boton variante="secundario" className="min-h-16" onClick={onCancelar}>
+      <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
+        <div className="mr-auto">
+          <p className="text-3xl font-bold tabular-nums">{valor > 0 ? formatearPesos(valor) : '$ —'}</p>
+          {!listo && <p className="text-base text-amber-900">Falta: {faltan.join(', ')}.</p>}
+        </div>
+        <Boton variante="secundario" onClick={onCancelar}>
           Cancelar
+        </Boton>
+        <Boton type="submit" className="min-w-40" disabled={!listo || guardando}>
+          {guardando ? 'Guardando...' : 'Guardar'}
         </Boton>
       </div>
     </form>
@@ -389,57 +422,71 @@ function ComprasDeHoy({
 }: {
   compras: CompraDeHoy[]
   puedeAnular: boolean
-  onAnular: (id: number) => void
+  onAnular: (c: CompraDeHoy) => Promise<void>
 }) {
   const [confirmando, setConfirmando] = useState<number | null>(null)
   if (compras.length === 0) return null
 
-  const total = compras.filter((c) => !c.anulada).reduce((suma, c) => suma + c.valor_pesos, 0)
+  const vigentes = compras.filter((c) => !c.anulada)
+  const total = vigentes.reduce((suma, c) => suma + c.valor_pesos, 0)
 
   return (
-    <div className="flex flex-col gap-3 border-t-2 border-stone-200 pt-6">
+    <div className="flex flex-col gap-2 pt-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-2xl font-bold">Hoy</h2>
-        <span className="text-xl font-semibold">{formatearPesos(total)}</span>
+        <h2 className="text-xl font-semibold">
+          Hoy <span className="text-base font-normal text-stone-600">
+            · {vigentes.length} {vigentes.length === 1 ? 'compra' : 'compras'}
+          </span>
+        </h2>
+        <span className="text-lg font-semibold tabular-nums">{formatearPesos(total)}</span>
       </div>
-      <ul className="flex flex-col gap-2">
+      <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
         {compras.map((c) => (
-          <li
-            key={c.id}
-            className={`flex flex-wrap items-center gap-3 rounded-2xl border-2 border-stone-200 bg-white p-4 ${
-              c.anulada ? 'opacity-50' : ''
-            }`}
-          >
-            <div className={`min-w-0 flex-1 ${c.anulada ? 'line-through' : ''}`}>
-              <p className="text-xl">
-                <span className="font-semibold">{c.personas?.nombre}</span>{' '}
-                <span className="text-stone-500">· {c.departamentos?.nombre}</span>
-              </p>
-              <p className="text-lg text-stone-600">
-                {c.descripcion} · {hora(c.creada_en)}
-              </p>
+          <li key={c.id}>
+            <div className="flex items-center gap-3 py-2 pr-3 pl-4">
+              <div className={`min-w-0 flex-1 ${c.anulada ? 'text-stone-500 line-through' : ''}`}>
+                <p className="text-lg">
+                  <span className="font-semibold">{c.personas?.nombre}</span>{' '}
+                  <span className={c.anulada ? '' : 'text-stone-600'}>· {c.departamentos?.nombre}</span>
+                </p>
+                <p className={`text-base ${c.anulada ? '' : 'text-stone-600'}`}>
+                  {c.descripcion} · {hora(c.creada_en)}
+                </p>
+              </div>
+              <span className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-stone-500 line-through' : ''}`}>
+                {formatearPesos(c.valor_pesos)}
+              </span>
+              {c.anulada ? (
+                <span className="w-24 text-center text-base text-stone-600">Anulada</span>
+              ) : (
+                puedeAnular && (
+                  <Boton
+                    variante="peligro"
+                    compacto
+                    className="w-24"
+                    disabled={confirmando === c.id}
+                    onClick={() => setConfirmando(c.id)}
+                  >
+                    Anular
+                  </Boton>
+                )
+              )}
             </div>
-            <span className="text-xl font-semibold">{formatearPesos(c.valor_pesos)}</span>
-            {c.anulada && <span className="text-base text-stone-500">Anulada</span>}
-            {puedeAnular && !c.anulada && confirmando !== c.id && (
-              <Boton variante="peligro" onClick={() => setConfirmando(c.id)}>
-                Anular
-              </Boton>
-            )}
             {confirmando === c.id && (
-              <div className="flex w-full items-center justify-end gap-3">
-                <span className="text-lg">¿Anular esta compra?</span>
+              <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-red-50 px-4 py-3">
+                <span className="mr-auto text-lg">¿Anular esta compra?</span>
+                <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
+                  No
+                </Boton>
                 <Boton
                   variante="peligro"
+                  compacto
                   onClick={() => {
                     setConfirmando(null)
-                    onAnular(c.id)
+                    onAnular(c)
                   }}
                 >
                   Sí, anular
-                </Boton>
-                <Boton variante="secundario" onClick={() => setConfirmando(null)}>
-                  No
                 </Boton>
               </div>
             )}

@@ -1,22 +1,60 @@
 @import "tailwindcss";
 
-/* Letra grande por defecto: la usuaria principal es una persona mayor en iPad. */
+@theme {
+  --text-titulo: 1.625rem;
+  --text-titulo--line-height: 1.2;
+  --animate-aparecer: aparecer 200ms ease-out;
+
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+  }
+}
+
+:root {
+  /* Alto de la barra de pestañas, sin contar la zona segura de abajo. */
+  --alto-pestanas: 4.25rem;
+}
+
+/*
+ * 17px, el texto normal de iPadOS. Todo lo demás se mide en rem a partir de
+ * aquí. En el iPad se usa el tamaño de texto elegido en Ajustes del iPad
+ * (Pantalla y brillo > Tamaño del texto), que por defecto también es 17px.
+ */
 html {
-  font-size: 20px;
+  font-size: 106.25%;
   -webkit-text-size-adjust: 100%;
+}
+
+@supports (font: -apple-system-body) {
+  @media (pointer: coarse) {
+    html {
+      font: -apple-system-body;
+    }
+  }
 }
 
 body {
   background: #fafaf9;
   color: #1c1917;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.4;
   -webkit-tap-highlight-color: transparent;
 }
 
 /* En la capa base para que clases como text-2xl sí puedan cambiar el tamaño. */
 @layer base {
   button,
-  input {
+  input,
+  select {
     font: inherit;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-amber-700);
+    outline-offset: 2px;
   }
 }
