@@ -5,12 +5,14 @@ import {
   ErrorDeVoz,
   hayMicrofono,
   transcribir,
+  type Corte,
   type Grabacion,
 } from '../lib/voz'
 
 type Estado = 'lista' | 'grabando' | 'procesando'
 
-/** Botón grande: se toca para hablar y se toca otra vez para terminar. */
+/** Botón grande: se toca para hablar y deja de escuchar solo cuando ella se calla
+ *  (también se puede tocar otra vez para terminar antes). */
 export function Microfono({
   vocabulario,
   onTexto,
@@ -43,7 +45,7 @@ export function Microfono({
   async function empezar() {
     onEmpezar()
     try {
-      grabacion.current = await empezarGrabacion(() => terminar())
+      grabacion.current = await empezarGrabacion((motivo) => terminar(motivo))
       const momento = Date.now()
       setInicio(momento)
       setAhora(momento)
@@ -53,10 +55,16 @@ export function Microfono({
     }
   }
 
-  async function terminar() {
+  async function terminar(motivo?: Corte) {
     const actual = grabacion.current
     if (!actual) return
     grabacion.current = null
+    if (motivo === 'sin-voz') {
+      actual.cancelar()
+      setEstado('lista')
+      onError('No se oyó nada. Intenta de nuevo, más cerca del iPad.')
+      return
+    }
     setEstado('procesando')
     try {
       const audio = await actual.terminar()
@@ -76,7 +84,7 @@ export function Microfono({
   }
   const textos: Record<Estado, string> = {
     lista: 'Tocar para hablar',
-    grabando: 'Escuchando... toca para terminar',
+    grabando: 'Te escucho... habla ahora',
     procesando: 'Entendiendo...',
   }
 
@@ -84,7 +92,7 @@ export function Microfono({
     <button
       type="button"
       disabled={estado === 'procesando'}
-      onClick={estado === 'lista' ? empezar : terminar}
+      onClick={estado === 'lista' ? empezar : () => terminar()}
       className={`flex min-h-24 w-full items-center justify-center gap-3 rounded-2xl px-5 text-xl font-semibold ${estilos[estado]}`}
     >
       {estado === 'grabando' ? (
