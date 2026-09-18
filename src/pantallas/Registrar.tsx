@@ -85,12 +85,14 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     if (data) setDepartamentos(data)
   }, [])
 
+  // Quien está en un departamento archivado tampoco aparece al registrar.
   const cargarPersonas = useCallback(async () => {
     const { data } = await supabase
       .from('personas')
-      .select('id, nombre, departamento_id, activo')
+      .select('id, nombre, departamento_id, activo, departamentos!inner(activo)')
       .eq('activo', true)
-    if (data) setPersonas(data)
+      .eq('departamentos.activo', true)
+    if (data) setPersonas(data.map(({ id, nombre, departamento_id, activo }) => ({ id, nombre, departamento_id, activo })))
   }, [])
 
   const cargarCompras = useCallback(async () => {
