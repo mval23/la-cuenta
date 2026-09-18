@@ -126,6 +126,22 @@ describe('operador', () => {
     })
   })
 
+  it('registra cuentas atrasadas hasta 60 días, pero no del futuro', async () => {
+    await como(OPERADOR, async () => {
+      await db.exec('begin')
+      const [c] = await filas(`insert into compras (persona_id, valor_pesos, fecha)
+        values (${juanTdh}, 1000, public.hoy_bogota() - 3) returning fecha = public.hoy_bogota() - 3 as ok`)
+      await db.exec('rollback')
+      expect(c.ok).toBe(true)
+      await expect(
+        db.query(`insert into compras (persona_id, valor_pesos, fecha) values (${juanTdh}, 1000, public.hoy_bogota() + 1)`),
+      ).rejects.toThrow()
+      await expect(
+        db.query(`insert into compras (persona_id, valor_pesos, fecha) values (${juanTdh}, 1000, public.hoy_bogota() - 61)`),
+      ).rejects.toThrow()
+    })
+  })
+
   it('saldo = compras - pagos', async () => {
     await como(OPERADOR, async () => {
       await db.query(`insert into pagos (persona_id, valor_pesos, tipo) values (${juanTdh}, 5000, 'abono')`)
@@ -192,6 +208,10 @@ describe('cocina', () => {
       ).rejects.toThrow()
       expect((await db.query('update compras set anulada = true')).affectedRows).toBe(0)
       await expect(db.query(`insert into departamentos (nombre) values ('Nuevo')`)).rejects.toThrow()
+      const [p] = await filas('select id from personas limit 1')
+      await expect(
+        db.query(`insert into compras (persona_id, valor_pesos, fecha) values (${p.id}, 1000, public.hoy_bogota() - 1)`),
+      ).rejects.toThrow()
     })
   })
 })

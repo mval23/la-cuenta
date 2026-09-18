@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
+import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
 import { leerDictado } from '../lib/dictado'
-import { hora, hoyBogota } from '../lib/fechas'
-import { normalizarNombre, resolverPersona, vocabulario } from '../lib/personas'
+import { fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
+import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Departamento, Perfil, Persona } from '../lib/tipos'
@@ -21,9 +22,11 @@ interface Borrador {
   departamentoId: number | null
   descripcion: string
   valor: string
+  /** El día de la compra, "2026-09-15". */
+  fecha: string
 }
 
-interface CompraDeHoy {
+interface CompraDelDia {
   id: number
   descripcion: string | null
   valor_pesos: number
@@ -37,16 +40,40 @@ function soloDigitos(texto: string): string {
   return texto.replace(/\D/g, '').replace(/^0+/, '')
 }
 
+function mayuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+/** " (martes 15 de septiembre)" si no es hoy; si es hoy, nada. */
+function sufijoDelDia(fecha: string, hoy: string): string {
+  return fecha === hoy ? '' : ` (${nombreDelDia(fecha, hoy).toLowerCase()})`
+}
+
 export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
   const [departamentos, setDepartamentos] = useState<Departamento[] | null>(null)
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [personas, setPersonas] = useState<Persona[]>([])
   const [texto, setTexto] = useState('')
   const [borrador, setBorrador] = useState<Borrador | null>(null)
-  const [hoy, setHoy] = useState<CompraDeHoy[]>([])
+  const [porAnular, setPorAnular] = useState<CompraDelDia | null>(null)
+  // Con el día al que pertenecen: al cambiar de día no se muestran las del anterior.
+  const [comprasCargadas, setComprasCargadas] = useState<{ dia: string; lista: CompraDelDia[] } | null>(null)
   const { aviso, mostrar, cerrar } = useAviso()
   const entrada = useRef<HTMLInputElement>(null)
   const puedeAnular = perfil.rol === 'admin' || perfil.rol === 'operador'
+  // La cocina solo registra lo de hoy; la base tampoco se lo permite.
+  const puedeCambiarDia = puedeAnular
+
+  // El día en que se están anotando las compras. Si se eligió otro día, dura
+  // hasta que se vuelva a hoy o hasta mañana: nunca queda pegado de un día para otro.
+  const hoy = hoyBogota()
+  const [eleccion, setEleccion] = useState<{ dia: string; elegidoEl: string } | null>(null)
+  const dia = eleccion && eleccion.elegidoEl === hoy ? eleccion.dia : hoy
+  const compras = comprasCargadas?.dia === dia ? comprasCargadas.lista : null
+  const cambiarDia = useCallback((nuevo: string) => {
+    const hoyAhora = hoyBogota()
+    setEleccion(nuevo === hoyAhora ? null : { dia: nuevo, elegidoEl: hoyAhora })
+  }, [])
 
   const cargarDepartamentos = useCallback(async () => {
     const { data, error } = await supabase
@@ -66,22 +93,25 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     if (data) setPersonas(data)
   }, [])
 
-  const cargarHoy = useCallback(async () => {
+  const cargarCompras = useCallback(async () => {
     const { data } = await supabase
       .from('compras')
       .select('id, descripcion, valor_pesos, anulada, creada_en, personas(nombre), departamentos(nombre)')
-      .eq('fecha', hoyBogota())
+      .eq('fecha', dia)
       .order('creada_en', { ascending: false })
-    if (data) setHoy(data as unknown as CompraDeHoy[])
-  }, [])
+    if (data) setComprasCargadas({ dia, lista: data as unknown as CompraDelDia[] })
+  }, [dia])
 
-  // Se recarga al volver a la pestaña: en Ajustes o en Cobrar pudo cambiar algo.
+  // Se recarga al volver a la pestaña: en otras pantallas pudo cambiar algo.
   useEffect(() => {
     if (!activa) return
     cargarDepartamentos()
     cargarPersonas()
-    cargarHoy()
-  }, [activa, cargarDepartamentos, cargarPersonas, cargarHoy])
+  }, [activa, cargarDepartamentos, cargarPersonas])
+
+  useEffect(() => {
+    if (activa) cargarCompras()
+  }, [activa, cargarCompras])
 
   function alEnviar(e: FormEvent) {
     e.preventDefault()
@@ -92,16 +122,41 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     const frase = texto.trim()
     if (!frase || !departamentos) return
     cerrar()
-    const dictado = leerDictado(frase, departamentos)
-    const resuelta = resolverPersona(dictado, personas)
+    setPorAnular(null)
+    const lectura = leerDictado(frase, departamentos, personas, hoyBogota())
+
+    if (lectura.tipo === 'anular') {
+      if (!puedeAnular) return
+      // La más reciente del día que se está viendo.
+      const ultima = compras?.find((c) => !c.anulada)
+      if (ultima) setPorAnular(ultima)
+      else mostrar({ tipo: 'error', texto: `No hay compras para anular${sufijoDelDia(dia, hoy) || ' hoy'}.` })
+      setTexto('')
+      return
+    }
+
+    const fecha = puedeCambiarDia ? (lectura.fecha ?? dia) : hoy
+    // Solo se dijo el día ("el martes"): desde ahora se anota en ese día.
+    const soloElDia =
+      lectura.fecha !== null && !lectura.nombre && !lectura.persona && lectura.valor === null && !lectura.descripcion
+    if (soloElDia) {
+      if (puedeCambiarDia) {
+        cambiarDia(fecha)
+        mostrar({ tipo: 'ok', texto: `Ahora se anotan las compras de${fecha === hoy ? ' hoy' : `l ${fechaLarga(fecha)}`}.` })
+      }
+      setTexto('')
+      return
+    }
+
     setBorrador({
       textoOriginal: frase,
-      personaId: resuelta.persona?.id ?? null,
-      candidatas: resuelta.candidatas,
-      nombreNuevo: dictado.nombre,
-      departamentoId: dictado.departamentoId,
-      descripcion: resuelta.descripcion,
-      valor: dictado.valor ? String(dictado.valor) : '',
+      personaId: lectura.persona?.id ?? null,
+      candidatas: lectura.candidatas,
+      nombreNuevo: lectura.nombre,
+      departamentoId: lectura.departamentoId,
+      descripcion: lectura.descripcion,
+      valor: lectura.valor ? String(lectura.valor) : '',
+      fecha,
     })
   }
 
@@ -124,6 +179,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
         descripcion: b.descripcion.trim() || null,
         valor_pesos: Number(b.valor),
         texto_original: b.textoOriginal,
+        fecha: b.fecha,
       })
       .select('id')
       .single()
@@ -133,15 +189,20 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     }
     const persona = personas.find((p) => p.id === personaId)
     const nombre = persona?.nombre ?? b.nombreNuevo.trim()
+    const hoyAhora = hoyBogota()
     mostrar({
       tipo: 'ok',
-      texto: `Guardado: ${[nombre, b.descripcion.trim(), formatearPesos(Number(b.valor))].filter(Boolean).join(', ')}`,
+      texto:
+        `Guardado: ${[nombre, b.descripcion.trim(), formatearPesos(Number(b.valor))].filter(Boolean).join(', ')}` +
+        sufijoDelDia(b.fecha, hoyAhora),
       deshacer: puedeAnular ? () => cambiarAnulada(data.id, true, 'Se deshizo la compra.') : undefined,
     })
+    // Si se dictó "ayer" o "el martes", lo que sigue suele ser del mismo día.
+    if (b.fecha !== dia) cambiarDia(b.fecha)
     setBorrador(null)
     setTexto('')
     cargarPersonas()
-    cargarHoy()
+    if (b.fecha === dia) cargarCompras()
     entrada.current?.focus()
   }
 
@@ -167,12 +228,13 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     const { error } = await supabase.from('compras').update({ anulada }).eq('id', id)
     if (error) mostrar({ tipo: 'error', texto: 'No se pudo hacer el cambio. Revisa el internet.' })
     else mostrar({ tipo: 'ok', texto: textoOk })
-    await cargarHoy()
+    await cargarCompras()
   }
 
-  async function anular(c: CompraDeHoy) {
+  async function anular(c: CompraDelDia) {
+    setPorAnular(null)
     const { error } = await supabase.from('compras').update({ anulada: true }).eq('id', c.id)
-    await cargarHoy()
+    await cargarCompras()
     if (error) {
       mostrar({ tipo: 'error', texto: 'No se pudo anular. Revisa el internet.' })
       return
@@ -193,20 +255,26 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   }
 
   return (
-    // En horizontal: a la izquierda se registra, a la derecha lo de hoy.
+    // En horizontal: a la izquierda se registra, a la derecha lo del día.
     <section className="flex flex-col gap-5 ancha:grid ancha:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] ancha:items-start ancha:gap-x-10">
       <div className="flex flex-col gap-5">
         <h1 className="text-titulo font-bold">Registrar</h1>
 
         {departamentos.length === 0 && (
           <p className="rounded-xl bg-info-suave p-4 text-lg text-info">
-            Primero hay que crear los departamentos, en Ajustes &gt; Departamentos.
+            Primero hay que crear los departamentos, en la pestaña Departamentos.
           </p>
         )}
 
-        {borrador ? (
+        {puedeCambiarDia && <DiaDeRegistro dia={dia} hoy={hoy} onCambiar={cambiarDia} />}
+
+        {porAnular ? (
+          <PreguntaAnular compra={porAnular} onSi={() => anular(porAnular)} onNo={() => setPorAnular(null)} />
+        ) : borrador ? (
           <Confirmacion
             borrador={borrador}
+            hoy={hoy}
+            puedeCambiarDia={puedeCambiarDia}
             departamentos={departamentos}
             personas={personas}
             onCambiar={setBorrador}
@@ -228,7 +296,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
               />
             )}
             <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
-              O escríbelo. Por ejemplo: Juan TDH almuerzo a 10 mil
+              O escríbelo. Por ejemplo: Juan TDH 10 mil
             </label>
             <div className="flex gap-3">
               <input
@@ -249,19 +317,79 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
         )}
       </div>
 
-      <ComprasDeHoy compras={hoy} puedeAnular={puedeAnular} onAnular={anular} />
+      <ComprasDelDia dia={dia} hoy={hoy} compras={compras} puedeAnular={puedeAnular} onAnular={anular} />
 
       <Aviso aviso={aviso} onCerrar={cerrar} />
     </section>
   )
 }
 
+// Día en que se anota ---------------------------------------------------------
+
+function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCambiar: (dia: string) => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const esHoy = dia === hoy
+
+  if (esHoy && !abierto) {
+    return (
+      <div className="-my-2 flex flex-wrap items-center gap-x-3">
+        <p className="text-lg text-tinta-suave">
+          Compras de <strong className="font-semibold text-tinta">hoy</strong>, {fechaLarga(hoy)}
+        </p>
+        <Boton variante="texto" compacto className="-ml-2" onClick={() => setAbierto(true)}>
+          ¿Son de otro día?
+        </Boton>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-xl p-4 ${esHoy ? 'bg-hundido' : 'border-2 border-aviso bg-aviso-suave'}`}
+      role={esHoy ? undefined : 'status'}
+    >
+      {esHoy ? (
+        <p className="text-lg font-semibold">¿De qué día son las compras que vas a anotar?</p>
+      ) : (
+        <div>
+          <p className="text-xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
+          <p className="text-base text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <ElegirDia
+          dia={dia}
+          hoy={hoy}
+          etiqueta="Día de las compras"
+          className="min-w-0 flex-1 basis-64"
+          onCambiar={(nuevo) => {
+            onCambiar(nuevo)
+            setAbierto(false)
+          }}
+        />
+        {esHoy ? (
+          <Boton variante="secundario" onClick={() => setAbierto(false)}>
+            Son de hoy
+          </Boton>
+        ) : (
+          <Boton variante="secundario" onClick={() => onCambiar(hoy)}>
+            Volver a hoy
+          </Boton>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Ayuda para dictar -----------------------------------------------------------
 
-const EJEMPLOS = [
-  'Juan TDH almuerzo a 10 mil',
-  'María José Bodega bandeja paisa y jugo por 18 mil',
-  'Pedro de Mantenimiento un tinto a mil quinientos',
+const EJEMPLOS: [string, string][] = [
+  ['Carlos 12', 'Carlos, 12 mil'],
+  ['Juan TDH 10 mil', 'si hay dos Juan, con el departamento'],
+  ['Pedro de Mantenimiento un tinto a mil quinientos', 'con lo que llevó'],
+  ['Ayer, Ana Bodega 15', 'una compra de otro día'],
+  ['El martes', 'desde ahora, todo queda del martes'],
+  ['Bórrala', 'anula la última compra'],
 ]
 
 function AyudaDictado() {
@@ -275,13 +403,13 @@ function AyudaDictado() {
       {abierta && (
         <div className="flex w-full flex-col gap-3 rounded-xl bg-hundido p-4">
           <p className="text-lg">
-            Se dice en este orden: <strong>quién</strong>, <strong>de qué departamento</strong>,{' '}
-            <strong>qué llevó</strong> y <strong>cuánto</strong>.
+            Basta con <strong>quién</strong> y <strong>cuánto</strong>. Si hace falta, también el departamento, qué
+            llevó y el día. «12» se entiende como 12 mil.
           </p>
           <ul className="flex flex-col gap-1.5">
-            {EJEMPLOS.map((ejemplo) => (
+            {EJEMPLOS.map(([ejemplo, explicacion]) => (
               <li key={ejemplo} className="rounded-lg bg-superficie px-3 py-2 text-lg">
-                «{ejemplo}»
+                «{ejemplo}» <span className="text-base text-tinta-suave">· {explicacion}</span>
               </li>
             ))}
           </ul>
@@ -299,6 +427,8 @@ function AyudaDictado() {
 
 function Confirmacion({
   borrador: b,
+  hoy,
+  puedeCambiarDia,
   departamentos,
   personas,
   onCambiar,
@@ -306,6 +436,8 @@ function Confirmacion({
   onCancelar,
 }: {
   borrador: Borrador
+  hoy: string
+  puedeCambiarDia: boolean
   departamentos: Departamento[]
   personas: Persona[]
   onCambiar: (b: Borrador) => void
@@ -315,10 +447,13 @@ function Confirmacion({
   const [guardando, setGuardando] = useState(false)
   // Con sugerencias, primero se muestran solo ellas; la persona nueva, si se pide.
   const [otraPersona, setOtraPersona] = useState(false)
+  // Casi nunca se dice qué llevó: el campo aparece solo si se dijo o se pide.
+  const [conDescripcion, setConDescripcion] = useState(b.descripcion !== '')
   const cambiar = (cambios: Partial<Borrador>) => onCambiar({ ...b, ...cambios })
   const nombreDepto = (id: number) => departamentos.find((d) => d.id === id)?.nombre ?? ''
   const elegida = personas.find((p) => p.id === b.personaId) ?? null
   const personaNueva = elegida === null && (b.candidatas.length === 0 || otraPersona)
+  const otroDia = b.fecha !== hoy
 
   const valor = Number(b.valor)
   const faltan = [
@@ -354,13 +489,14 @@ function Confirmacion({
     <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-linea bg-superficie p-5 shadow-sm">
       <p className="text-base text-tinta-suave">Se entendió: «{b.textoOriginal}»</p>
 
+      {/* Quién */}
       <div className="flex flex-col gap-2">
         <span className="text-base font-semibold text-tinta-suave">Quién</span>
         {elegida ? (
           <div className="flex items-center gap-3">
-            <p className="flex-1 text-xl font-semibold">
+            <p className="min-w-0 flex-1 text-2xl font-bold">
               {elegida.nombre}{' '}
-              <span className="font-normal text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
+              <span className="text-xl font-normal text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
             </p>
             <Boton
               variante="secundario"
@@ -378,7 +514,7 @@ function Confirmacion({
           </div>
         ) : personaNueva ? (
           <>
-            <p className="text-base text-tinta-suave">Persona nueva. Revisa el nombre y el departamento:</p>
+            <p className="text-base text-tinta-suave">Persona nueva. Revisa el nombre y elige el departamento:</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 value={b.nombreNuevo}
@@ -386,6 +522,7 @@ function Confirmacion({
                 placeholder="Nombre"
                 aria-label="Nombre de la persona nueva"
                 autoComplete="off"
+                autoCapitalize="words"
                 className={campo}
               />
               <select
@@ -431,33 +568,65 @@ function Confirmacion({
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
+      {/* Cuánto y qué día */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
+          <span className="flex min-h-16 items-center rounded-xl border border-control bg-superficie px-4 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-marca">
+            <span aria-hidden="true" className="text-3xl font-bold text-tinta-suave">
+              $
+            </span>
+            <input
+              ref={campoValor}
+              value={b.valor === '' ? '' : Number(b.valor).toLocaleString('es-CO')}
+              onChange={(e) => {
+                setPreguntando(false)
+                cambiar({ valor: soloDigitos(e.target.value) })
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="0"
+              aria-label="Cuánto, en pesos"
+              className="w-full min-w-0 bg-transparent pl-1 text-3xl font-bold tabular-nums outline-none placeholder:text-tinta-tenue"
+            />
+          </span>
+        </label>
+        <div className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Día</span>
+          {puedeCambiarDia ? (
+            <ElegirDia
+              dia={b.fecha}
+              hoy={hoy}
+              etiqueta="Día de la compra"
+              resaltado={otroDia}
+              grande
+              onCambiar={(fecha) => cambiar({ fecha })}
+            />
+          ) : (
+            <p className="flex min-h-16 items-center text-lg">Hoy</p>
+          )}
+        </div>
+      </div>
+
+      {/* Qué llevó: opcional */}
+      {conDescripcion ? (
         <label className="flex flex-col gap-2">
           <span className="text-base font-semibold text-tinta-suave">
-            Qué <span className="font-normal">(opcional)</span>
+            Qué llevó <span className="font-normal">(opcional)</span>
           </span>
           <input
             value={b.descripcion}
             onChange={(e) => cambiar({ descripcion: e.target.value })}
             autoComplete="off"
+            autoFocus={b.descripcion === ''}
             className={campo}
           />
         </label>
-        <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
-          <input
-            ref={campoValor}
-            value={b.valor}
-            onChange={(e) => {
-              setPreguntando(false)
-              cambiar({ valor: soloDigitos(e.target.value) })
-            }}
-            inputMode="numeric"
-            autoComplete="off"
-            className={`${campo} tabular-nums`}
-          />
-        </label>
-      </div>
+      ) : (
+        <Boton variante="texto" compacto className="-my-2 -ml-4 self-start" onClick={() => setConDescripcion(true)}>
+          + Anotar qué llevó
+        </Boton>
+      )}
 
       {preguntando ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-aviso-suave p-4">
@@ -479,37 +648,74 @@ function Confirmacion({
           </Boton>
         </div>
       ) : (
-      <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-4">
-        <div className="mr-auto">
-          <p className="text-3xl font-bold tabular-nums">{valor > 0 ? formatearPesos(valor) : '$ —'}</p>
-          {!listo && <p className="text-base text-aviso">Falta: {faltan.join(', ')}.</p>}
+        <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-4">
+          <p className="mr-auto text-base text-aviso">{!listo && `Falta: ${faltan.join(', ')}.`}</p>
+          <Boton variante="secundario" onClick={onCancelar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" className="min-w-44" disabled={!listo || guardando}>
+            {guardando ? 'Guardando...' : valor > 0 ? `Guardar ${formatearPesos(valor)}` : 'Guardar'}
+          </Boton>
         </div>
-        <Boton variante="secundario" onClick={onCancelar}>
-          Cancelar
-        </Boton>
-        <Boton type="submit" className="min-w-40" disabled={!listo || guardando}>
-          {guardando ? 'Guardando...' : 'Guardar'}
-        </Boton>
-      </div>
       )}
     </form>
   )
 }
 
-// Lo registrado hoy -----------------------------------------------------------
+// "Bórrala" -------------------------------------------------------------------
 
-function ComprasDeHoy({
+function PreguntaAnular({ compra: c, onSi, onNo }: { compra: CompraDelDia; onSi: () => void; onNo: () => void }) {
+  return (
+    <div role="alert" className="flex flex-col gap-4 rounded-2xl border-2 border-peligro-linea bg-peligro-suave p-5">
+      <p className="text-xl font-bold">¿Anular la última compra?</p>
+      <div className="rounded-xl bg-superficie px-4 py-3">
+        <p className="text-xl">
+          <span className="font-semibold">{c.personas?.nombre}</span>{' '}
+          <span className="text-tinta-suave">· {c.departamentos?.nombre}</span>
+        </p>
+        <p className="text-lg text-tinta-suave">
+          <span className="font-semibold text-tinta tabular-nums">{formatearPesos(c.valor_pesos)}</span>
+          {c.descripcion && ` · ${c.descripcion}`} · anotada a las {hora(c.creada_en)}
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-end gap-3">
+        <Boton variante="secundario" onClick={onNo}>
+          No
+        </Boton>
+        <Boton variante="peligro" onClick={onSi}>
+          Sí, anular
+        </Boton>
+      </div>
+    </div>
+  )
+}
+
+// Lo registrado en el día -----------------------------------------------------
+
+function ComprasDelDia({
+  dia,
+  hoy,
   compras,
   puedeAnular,
   onAnular,
 }: {
-  compras: CompraDeHoy[]
+  dia: string
+  hoy: string
+  compras: CompraDelDia[] | null
   puedeAnular: boolean
-  onAnular: (c: CompraDeHoy) => Promise<void>
+  onAnular: (c: CompraDelDia) => Promise<void>
 }) {
   const [confirmando, setConfirmando] = useState<number | null>(null)
+  const titulo = mayuscula(nombreDelDia(dia, hoy))
+
+  if (compras === null) return <p className="pt-3 text-lg text-tinta-suave ancha:pt-1">Cargando...</p>
+
   if (compras.length === 0) {
-    return <p className="pt-3 text-lg text-tinta-suave ancha:pt-1">Hoy todavía no se ha registrado nada.</p>
+    return (
+      <p className="pt-3 text-lg text-tinta-suave ancha:pt-1">
+        {dia === hoy ? 'Hoy todavía no se ha registrado nada.' : `No hay compras del ${fechaLarga(dia)}.`}
+      </p>
+    )
   }
 
   const vigentes = compras.filter((c) => !c.anulada)
@@ -519,7 +725,8 @@ function ComprasDeHoy({
     <div className="flex flex-col gap-2 pt-3 ancha:pt-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-xl font-semibold">
-          Hoy <span className="text-base font-normal text-tinta-suave">
+          {titulo}{' '}
+          <span className="text-base font-normal text-tinta-suave">
             · {vigentes.length} {vigentes.length === 1 ? 'compra' : 'compras'}
           </span>
         </h2>
@@ -536,7 +743,7 @@ function ComprasDeHoy({
                 </p>
                 <p className={`text-base ${c.anulada ? '' : 'text-tinta-suave'}`}>
                   {c.descripcion && `${c.descripcion} · `}
-                  {hora(c.creada_en)}
+                  {dia === hoy ? hora(c.creada_en) : `anotada a las ${hora(c.creada_en)}`}
                 </p>
               </div>
               <span className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
