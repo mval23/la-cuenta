@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
+import { Microfono } from '../componentes/Microfono'
 import { leerDictado } from '../lib/dictado'
 import { hora, hoyBogota } from '../lib/fechas'
-import { normalizarNombre, resolverPersona } from '../lib/personas'
+import { normalizarNombre, resolverPersona, vocabulario } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Departamento, Perfil, Persona } from '../lib/tipos'
@@ -74,8 +75,12 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
     cargarHoy()
   }, [cargarPersonas, cargarHoy])
 
-  function leer(e: FormEvent) {
+  function alEnviar(e: FormEvent) {
     e.preventDefault()
+    leer(texto)
+  }
+
+  function leer(texto: string) {
     const frase = texto.trim()
     if (!frase || !departamentos) return
     setAviso(null)
@@ -175,9 +180,18 @@ export function Registrar({ perfil }: { perfil: Perfil }) {
           onCancelar={cancelar}
         />
       ) : (
-        <form onSubmit={leer} className="flex flex-col gap-3">
+        <form onSubmit={alEnviar} className="flex flex-col gap-3">
+          <Microfono
+            vocabulario={() => vocabulario(personas, departamentos)}
+            onTexto={(dicho) => {
+              setTexto(dicho)
+              leer(dicho)
+            }}
+            onError={(mensaje) => setAviso({ tipo: 'error', texto: mensaje })}
+            onEmpezar={() => setAviso(null)}
+          />
           <label htmlFor="frase" className="text-lg text-stone-600">
-            Quién, departamento, qué y cuánto. Por ejemplo: Juan TDH almuerzo a 10 mil
+            O escríbelo: quién, departamento, qué y cuánto. Por ejemplo: Juan TDH almuerzo a 10 mil
           </label>
           <div className="flex gap-3">
             <input

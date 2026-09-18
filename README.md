@@ -22,6 +22,12 @@ Es una aplicación web instalable (PWA) pensada para usarse en iPad, con letra y
 
 El esquema está en `supabase/migrations/` y sus pruebas en `supabase/tests/`.
 
+## Voz
+
+El iPad graba el audio y lo envía a `api/transcribir.ts`, una función de Vercel que lo pasa a texto con Groq Whisper (`whisper-large-v3`). Le manda como pista los nombres de departamentos y personas para que los escriba bien. La función solo atiende a usuarias con sesión de Supabase. El texto pasa por el mismo lector de frases que cuando se escribe a mano, y siempre se confirma antes de guardar.
+
+`npm run dev` también atiende las funciones de `api/`, así que en local basta con poner `GROQ_API_KEY` en `.env.local`.
+
 ## Desarrollo local
 
 ```bash
@@ -57,7 +63,7 @@ npm test
 ### 2. Vercel
 
 1. Importar el repositorio de GitHub. Vercel detecta Vite solo.
-2. Agregar las variables de entorno `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_USUARIAS` (por ejemplo `Amparo:correo-de-amparo,Mariana:correo-de-mariana`).
+2. Agregar las variables de entorno `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_USUARIAS` (por ejemplo `Amparo:correo-de-amparo,Mariana:correo-de-mariana`), y `GROQ_API_KEY` (la clave de console.groq.com; esta no lleva `VITE_` para que nunca llegue a la app).
 3. Publicar.
 
 ### 3. iPad
