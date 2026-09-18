@@ -46,6 +46,14 @@ if [ "$(consulta 'select count(*) from auth.users')" = 0 ]; then
 fi
 
 echo "Restaurando los datos..."
+# pg_restore carga las tablas en orden alfabético y las compras irían antes que
+# las personas a las que apuntan. Con una lista se cargan en el orden de $tablas.
+lista=$(mktemp)
+pg_restore -l "$carpeta/la-cuenta.dump" > "$lista.todo"
+{
+  grep -v 'TABLE DATA' "$lista.todo"
+  for tabla in $tablas; do grep -E "TABLE DATA public $tabla " "$lista.todo"; done
+} > "$lista"
 {
   echo "begin;"
   if [ "$reemplazar" = --reemplazar ]; then
@@ -54,10 +62,11 @@ echo "Restaurando los datos..."
   # Los triggers de la app no deben correr al cargar: por ejemplo, el que pone
   # a cada compra el departamento actual de la persona cambiaría la historia.
   for tabla in $tablas; do echo "alter table public.$tabla disable trigger user;"; done
-  pg_restore --data-only --no-owner --no-privileges -f - "$carpeta/la-cuenta.dump"
+  pg_restore --data-only --no-owner --no-privileges -L "$lista" -f - "$carpeta/la-cuenta.dump"
   for tabla in $tablas; do echo "alter table public.$tabla enable trigger user;"; done
   echo "commit;"
 } | psql "$db" -v ON_ERROR_STOP=1 -q > /dev/null
+rm -f "$lista" "$lista.todo"
 
 for tabla in $tablas; do
   echo "$tabla: $(consulta "select count(*) from public.$tabla") filas"

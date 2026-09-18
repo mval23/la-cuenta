@@ -30,7 +30,7 @@ export function TecladoPin({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-center text-xl font-semibold">{titulo}</p>
+      <p className="flex min-h-14 items-center justify-center text-center text-xl font-semibold">{titulo}</p>
 
       <div className="flex justify-center gap-4" aria-label={`${pin.length} de ${LARGO_PIN} números`}>
         {Array.from({ length: LARGO_PIN }, (_, i) => (
@@ -38,7 +38,8 @@ export function TecladoPin({
         ))}
       </div>
 
-      <div className="min-h-7 text-center text-lg" role="alert">
+      {/* Alto fijo para dos líneas: si el mensaje cambia, las teclas no se mueven bajo el dedo. */}
+      <div className="flex min-h-14 items-center justify-center text-center text-lg" role="alert">
         {mensaje}
       </div>
 

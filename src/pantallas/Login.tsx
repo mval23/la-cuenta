@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
 import { campo } from '../componentes/estilos'
-import { LARGO_PIN, olvidarPin } from '../lib/candado'
+import { LARGO_PIN, olvidarPin, quedoBloqueado } from '../lib/candado'
 import { supabase } from '../lib/supabase'
 
 /**
@@ -14,6 +14,7 @@ export function Login() {
   const [clave, setClave] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [entrando, setEntrando] = useState(false)
+  const [bloqueado] = useState(() => quedoBloqueado(localStorage))
 
   async function entrar(e: FormEvent) {
     e.preventDefault()
@@ -42,6 +43,11 @@ export function Login() {
       <p className="mb-6 text-center text-xl text-tinta-suave">Configurar este dispositivo</p>
 
       <form onSubmit={entrar} className="flex flex-col gap-4">
+        {bloqueado && (
+          <p className="rounded-xl bg-aviso-suave p-4 text-lg" role="status">
+            Se cerró la sesión porque el PIN se escribió mal muchas veces.
+          </p>
+        )}
         <p className="text-lg">
           Esto se hace una sola vez. Después, La Cuenta se abre con un PIN de {LARGO_PIN} números.
         </p>
