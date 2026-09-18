@@ -1,0 +1,198 @@
+import type { PostgrestError } from '@supabase/supabase-js'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Boton } from '../componentes/Boton'
+import { supabase } from '../lib/supabase'
+import type { Departamento } from '../lib/tipos'
+
+const campo = 'min-h-14 rounded-2xl border-2 border-stone-300 bg-white px-4'
+
+function mensajeDeError(error: PostgrestError): string {
+  if (error.code === '23505') return 'Ya existe un departamento con ese nombre.'
+  return 'No se pudo guardar. Revisa la conexión e intenta de nuevo.'
+}
+
+function aliasDesdeTexto(texto: string): string[] {
+  return texto
+    .split(',')
+    .map((a) => a.trim())
+    .filter((a) => a !== '')
+}
+
+export function Departamentos() {
+  const [lista, setLista] = useState<Departamento[] | null>(null)
+  const [nuevo, setNuevo] = useState('')
+  const [editando, setEditando] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const cargar = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('departamentos')
+      .select('id, nombre, alias, activo')
+      .order('nombre')
+    if (error) setError('No se pudieron cargar los departamentos.')
+    else setLista(data)
+  }, [])
+
+  useEffect(() => {
+    cargar()
+  }, [cargar])
+
+  async function agregar(e: FormEvent) {
+    e.preventDefault()
+    const nombre = nuevo.trim()
+    if (!nombre) return
+    setError(null)
+    const { error } = await supabase.from('departamentos').insert({ nombre })
+    if (error) return setError(mensajeDeError(error))
+    setNuevo('')
+    cargar()
+  }
+
+  async function actualizar(id: number, cambios: Partial<Omit<Departamento, 'id'>>) {
+    setError(null)
+    const { error } = await supabase.from('departamentos').update(cambios).eq('id', id)
+    if (error) {
+      setError(mensajeDeError(error))
+      return false
+    }
+    await cargar()
+    return true
+  }
+
+  if (lista === null) {
+    return <p className="text-lg text-stone-500">{error ?? 'Cargando departamentos...'}</p>
+  }
+
+  const activos = lista.filter((d) => d.activo)
+  const archivados = lista.filter((d) => !d.activo)
+
+  return (
+    <div className="flex flex-col gap-5">
+      <h2 className="text-2xl font-bold">Departamentos</h2>
+
+      {error && <p className="text-lg text-red-800">{error}</p>}
+
+      {activos.length === 0 && (
+        <p className="text-lg text-stone-600">Todavía no hay departamentos. Agrega el primero.</p>
+      )}
+
+      <ul className="flex flex-col gap-3">
+        {activos.map((d) =>
+          editando === d.id ? (
+            <EditarDepartamento
+              key={d.id}
+              departamento={d}
+              onGuardar={async (cambios) => {
+                if (await actualizar(d.id, cambios)) setEditando(null)
+              }}
+              onCancelar={() => setEditando(null)}
+            />
+          ) : (
+            <li
+              key={d.id}
+              className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-stone-200 bg-white p-4"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-xl font-semibold">{d.nombre}</p>
+                {d.alias.length > 0 && (
+                  <p className="text-base text-stone-500">También: {d.alias.join(', ')}</p>
+                )}
+              </div>
+              <Boton variante="secundario" onClick={() => setEditando(d.id)}>
+                Cambiar
+              </Boton>
+              <Boton variante="peligro" onClick={() => actualizar(d.id, { activo: false })}>
+                Archivar
+              </Boton>
+            </li>
+          ),
+        )}
+      </ul>
+
+      <form onSubmit={agregar} className="flex flex-wrap gap-3">
+        <input
+          value={nuevo}
+          onChange={(e) => setNuevo(e.target.value)}
+          placeholder="Nombre del departamento"
+          aria-label="Nombre del nuevo departamento"
+          className={`${campo} min-w-0 flex-1`}
+        />
+        <button
+          type="submit"
+          disabled={!nuevo.trim()}
+          className="min-h-14 rounded-2xl bg-amber-800 px-6 font-semibold text-white active:bg-amber-900 disabled:bg-stone-400"
+        >
+          Agregar
+        </button>
+      </form>
+
+      {archivados.length > 0 && (
+        <details className="rounded-2xl border-2 border-stone-200 bg-white p-4">
+          <summary className="cursor-pointer text-lg font-semibold text-stone-600">
+            Archivados ({archivados.length})
+          </summary>
+          <ul className="mt-3 flex flex-col gap-3">
+            {archivados.map((d) => (
+              <li key={d.id} className="flex items-center gap-3">
+                <span className="flex-1 text-lg text-stone-600">{d.nombre}</span>
+                <Boton variante="secundario" onClick={() => actualizar(d.id, { activo: true })}>
+                  Reactivar
+                </Boton>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  )
+}
+
+function EditarDepartamento({
+  departamento,
+  onGuardar,
+  onCancelar,
+}: {
+  departamento: Departamento
+  onGuardar: (cambios: { nombre: string; alias: string[] }) => void
+  onCancelar: () => void
+}) {
+  const [nombre, setNombre] = useState(departamento.nombre)
+  const [alias, setAlias] = useState(departamento.alias.join(', '))
+
+  function guardar(e: FormEvent) {
+    e.preventDefault()
+    if (!nombre.trim()) return
+    onGuardar({ nombre: nombre.trim(), alias: aliasDesdeTexto(alias) })
+  }
+
+  return (
+    <li className="rounded-2xl border-2 border-amber-700 bg-white p-4">
+      <form onSubmit={guardar} className="flex flex-col gap-4">
+        <label className="flex flex-col gap-2">
+          <span className="font-semibold">Nombre</span>
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={campo} />
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="font-semibold">Otras formas de decirlo (separadas por coma)</span>
+          <input
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            placeholder="te de hache, talento humano"
+            className={campo}
+          />
+        </label>
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            className="min-h-14 rounded-2xl bg-amber-800 px-6 font-semibold text-white active:bg-amber-900"
+          >
+            Guardar
+          </button>
+          <Boton variante="secundario" onClick={onCancelar}>
+            Cancelar
+          </Boton>
+        </div>
+      </form>
+    </li>
+  )
+}

@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Letra grande por defecto: la usuaria principal es una persona mayor en iPad. */
+html {
+  font-size: 20px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #fafaf9;
+  color: #1c1917;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* En la capa base para que clases como text-2xl sí puedan cambiar el tamaño. */
+@layer base {
+  button,
+  input {
+    font: inherit;
+  }
+}
