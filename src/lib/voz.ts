@@ -2,10 +2,12 @@
 // (api/transcribir.ts). El motor de voz vive en el servidor, así que se puede
 // cambiar sin tocar la app.
 
+import { crearDetector, volumen } from './silencio'
 import { supabase } from './supabase'
 
-// Si la usuaria olvida tocar para terminar, la grabación se corta sola.
+// Tope por si el detector de silencio nunca decide (ruido constante).
 export const DURACION_MAXIMA_MS = 30_000
+const CADA_MS = 50
 
 // Safari en iPad graba en mp4; Chrome en webm. Groq acepta los dos.
 const FORMATOS = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
@@ -17,12 +19,24 @@ export interface Grabacion {
   cancelar: () => void
 }
 
+/** Por qué la grabación se detuvo sola. */
+export type Corte = 'silencio' | 'sin-voz' | 'tiempo'
+
 export function hayMicrofono(): boolean {
   return typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
-export async function empezarGrabacion(alCortarse: () => void): Promise<Grabacion> {
-  const flujo = await navigator.mediaDevices.getUserMedia({ audio: true })
+export async function empezarGrabacion(alCortarse: (motivo: Corte) => void): Promise<Grabacion> {
+  // Se crea antes del primer await: Safari solo deja activar el audio si nace
+  // del toque de la usuaria.
+  const contexto = new AudioContext()
+  let flujo: MediaStream
+  try {
+    flujo = await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch (e) {
+    void contexto.close()
+    throw e
+  }
   const mimeType = FORMATOS.find((f) => MediaRecorder.isTypeSupported(f))
   const grabadora = new MediaRecorder(flujo, mimeType ? { mimeType } : undefined)
   const partes: Blob[] = []
@@ -34,15 +48,39 @@ export async function empezarGrabacion(alCortarse: () => void): Promise<Grabacio
     grabadora.onstop = () => {
       // Apaga el micrófono (y el indicador naranja del iPad).
       flujo.getTracks().forEach((t) => t.stop())
+      void contexto.close()
       resolver(new Blob(partes, { type: grabadora.mimeType || mimeType || 'audio/mp4' }))
     }
   })
 
-  const corte = setTimeout(alCortarse, DURACION_MAXIMA_MS)
+  // Escucha el volumen para saber cuándo terminó de hablar.
+  const analizador = contexto.createAnalyser()
+  analizador.fftSize = 2048
+  contexto.createMediaStreamSource(flujo).connect(analizador)
+  void contexto.resume()
+  const muestras = new Float32Array(analizador.fftSize)
+  const detector = crearDetector()
+  let cortada = false
+  function cortar(motivo: Corte) {
+    if (cortada) return
+    cortada = true
+    detener()
+    alCortarse(motivo)
+  }
+  const escucha = setInterval(() => {
+    analizador.getFloatTimeDomainData(muestras)
+    const decision = detector.paso(volumen(muestras), CADA_MS)
+    if (decision === 'termino') cortar('silencio')
+    else if (decision === 'sin-voz') cortar('sin-voz')
+  }, CADA_MS)
+
+  const corte = setTimeout(() => cortar('tiempo'), DURACION_MAXIMA_MS)
   grabadora.start()
 
   function detener() {
+    cortada = true
     clearTimeout(corte)
+    clearInterval(escucha)
     if (grabadora.state !== 'inactive') grabadora.stop()
   }
 
