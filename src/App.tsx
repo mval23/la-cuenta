@@ -50,7 +50,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 pb-32">
-        {pestana === 'registrar' && <Registrar />}
+        {pestana === 'registrar' && <Registrar perfil={perfil} />}
         {pestana === 'cobrar' && <Cobrar />}
         {pestana === 'ajustes' && <Ajustes perfil={perfil} />}
       </main>
