@@ -200,7 +200,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
 
         {departamentos.length === 0 && (
           <p className="rounded-xl bg-amber-50 p-4 text-lg text-amber-900">
-            Primero hay que crear los departamentos en Ajustes.
+            Primero hay que crear los departamentos, en Ajustes &gt; Departamentos.
           </p>
         )}
 

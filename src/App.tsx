@@ -98,7 +98,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
           <Cobrar perfil={perfil} activa={pestana === 'cobrar'} />
         </div>
         <div hidden={pestana !== 'ajustes'}>
-          <Ajustes perfil={perfil} />
+          <Ajustes perfil={perfil} activa={pestana === 'ajustes'} />
         </div>
       </main>
 
