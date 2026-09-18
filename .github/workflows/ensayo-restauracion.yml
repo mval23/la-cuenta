@@ -1,0 +1,97 @@
+# Ensayo de restauración del respaldo diario.
+#
+# Un respaldo solo sirve si se puede restaurar. Una vez al mes toma el último
+# respaldo guardado por "Respaldo diario", lo restaura en un Supabase nuevo y
+# vacío siguiendo los pasos del README y revisa que quede completo: las mismas
+# filas, los mismos saldos, el mismo esquema que las migraciones y que la app
+# pueda seguir anotando. Si algo falla, GitHub avisa por correo.
+#
+# Todo pasa dentro de la máquina de GitHub y se borra al terminar. Los
+# registros solo muestran conteos, nunca nombres ni valores.
+
+name: Ensayo de restauración
+
+on:
+  schedule:
+    # Día 1 de cada mes, 4:00 a. m. en Colombia (9:00 UTC).
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/ensayo-restauracion.yml
+      - scripts/verificar-restauracion.sh
+      - supabase/migrations/**
+
+permissions:
+  contents: read
+  # Para bajar el respaldo guardado por otro workflow.
+  actions: read
+
+env:
+  DB: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  # Solo la base y la autenticación: lo demás de Supabase no hace falta aquí.
+  SIN: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+jobs:
+  ensayo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Bajar el último respaldo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow respaldo.yml --status success \
+            --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$id" ]; then
+            echo "::error::No hay ningún respaldo guardado."
+            exit 1
+          fi
+          gh run download "$id" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/respaldo"
+          dump=$(find "$RUNNER_TEMP/respaldo" -name la-cuenta.dump | head -1)
+          carpeta=$(dirname "$dump")
+          echo "Respaldo: $(basename "$carpeta"), de la ejecución $id"
+          echo "RESPALDO=$carpeta" >> "$GITHUB_ENV"
+
+      - name: Instalar pg_restore 17, la versión de la base
+        run: |
+          sudo apt-get install -y -qq postgresql-common > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq postgresql-client-17 > /dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Esquema de referencia (las migraciones en una base limpia)
+        run: |
+          supabase start -x "$SIN"
+          pg_dump "$DB" --schema=public --schema-only --no-owner > "$RUNNER_TEMP/referencia.sql"
+          supabase stop --no-backup
+
+      - name: Supabase nuevo y vacío, como un proyecto recién creado
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir nuevo && cd nuevo
+          supabase init
+          sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
+          supabase start -x "$SIN"
+
+      - name: Restaurar con los pasos del README (proyecto nuevo)
+        run: |
+          set +e
+          pg_restore --data-only --no-owner -d "$DB" "$RESPALDO/usuarias.dump"
+          usuarias=$?
+          pg_restore --no-owner --no-privileges -d "$DB" "$RESPALDO/la-cuenta.dump"
+          base=$?
+          echo "pg_restore usuarias: $usuarias. pg_restore base: $base."
+          # Se sigue aunque falle: la verificación dice qué quedó mal.
+          if [ $usuarias -ne 0 ] || [ $base -ne 0 ]; then
+            echo "::warning::pg_restore terminó con errores (ver arriba)."
+          fi
+
+      - name: Verificar
+        run: bash scripts/verificar-restauracion.sh "$DB" "$RESPALDO" "$RUNNER_TEMP/referencia.sql"
