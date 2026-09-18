@@ -51,8 +51,8 @@ export function Microfono({
 
   const estilos: Record<Estado, string> = {
     lista: 'bg-amber-800 text-white active:bg-amber-900',
-    grabando: 'bg-red-700 text-white animate-pulse',
-    procesando: 'bg-stone-400 text-white',
+    grabando: 'bg-red-700 text-white active:bg-red-800',
+    procesando: 'bg-stone-200 text-stone-700',
   }
   const textos: Record<Estado, string> = {
     lista: 'Tocar para hablar',
@@ -65,18 +65,17 @@ export function Microfono({
       type="button"
       disabled={estado === 'procesando'}
       onClick={estado === 'lista' ? empezar : terminar}
-      className={`flex min-h-32 w-full items-center justify-center gap-4 rounded-3xl text-2xl font-bold ${estilos[estado]}`}
+      className={`flex min-h-24 w-full items-center justify-center gap-3 rounded-2xl px-5 text-xl font-semibold ${estilos[estado]}`}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-12 w-12 fill-none stroke-current stroke-2">
-        {estado === 'grabando' ? (
-          <rect x="6" y="6" width="12" height="12" rx="2" className="fill-current" />
-        ) : (
-          <>
-            <rect x="9" y="2" width="6" height="12" rx="3" />
-            <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" strokeLinecap="round" />
-          </>
-        )}
-      </svg>
+      {estado === 'grabando' ? (
+        // Solo el punto late, no el botón entero.
+        <span aria-hidden="true" className="h-4 w-4 rounded-full bg-white motion-safe:animate-pulse" />
+      ) : (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-8 w-8 fill-none stroke-current stroke-2">
+          <rect x="9" y="2" width="6" height="12" rx="3" />
+          <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" strokeLinecap="round" />
+        </svg>
+      )}
       {textos[estado]}
     </button>
   )

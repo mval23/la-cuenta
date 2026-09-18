@@ -40,3 +40,10 @@ describe('agruparParaCobro al buscar', () => {
     expect(grupos[0].personas.map((p) => [p.nombre, p.saldo])).toEqual([['Rosa', 0]])
   })
 })
+
+describe('agruparParaCobro después de pagar', () => {
+  it('mantiene en la lista a quien acaba de quedar al día, para que no salte', () => {
+    const grupos = agruparParaCobro(saldos, '', new Set([4]))
+    expect(grupos[0].personas.map((p) => p.nombre)).toEqual(['Juan', 'Luis', 'Rosa'])
+  })
+})

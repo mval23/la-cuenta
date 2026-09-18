@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Boton } from './componentes/Boton'
 import { supabase } from './lib/supabase'
 import type { Perfil } from './lib/tipos'
@@ -10,10 +10,34 @@ import { Registrar } from './pantallas/Registrar'
 
 type Pestana = 'registrar' | 'cobrar' | 'ajustes'
 
-const pestanas: { id: Pestana; titulo: string }[] = [
-  { id: 'registrar', titulo: 'Registrar' },
-  { id: 'cobrar', titulo: 'Cobrar' },
-  { id: 'ajustes', titulo: 'Ajustes' },
+const pestanas: { id: Pestana; titulo: string; icono: ReactNode }[] = [
+  {
+    id: 'registrar',
+    titulo: 'Registrar',
+    icono: (
+      <path d="M21.2 6.8a1 1 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8l-1.3 4.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z" />
+    ),
+  },
+  {
+    id: 'cobrar',
+    titulo: 'Cobrar',
+    icono: (
+      <>
+        <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+      </>
+    ),
+  },
+  {
+    id: 'ajustes',
+    titulo: 'Ajustes',
+    icono: (
+      <>
+        <path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ),
+  },
 ]
 
 export default function App() {
@@ -34,6 +58,8 @@ export default function App() {
 function ConSesion({ usuarioId }: { usuarioId: string }) {
   const [perfil, setPerfil] = useState<Perfil | null | undefined>(undefined)
   const [pestana, setPestana] = useState<Pestana>('registrar')
+  // Cada pestaña recuerda hasta dónde se había bajado.
+  const posiciones = useRef<Record<Pestana, number>>({ registrar: 0, cobrar: 0, ajustes: 0 })
 
   useEffect(() => {
     supabase
@@ -44,29 +70,57 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
       .then(({ data }) => setPerfil(data))
   }, [usuarioId])
 
+  useLayoutEffect(() => {
+    window.scrollTo(0, posiciones.current[pestana])
+  }, [pestana])
+
+  function cambiar(nueva: Pestana) {
+    if (nueva === pestana) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    posiciones.current[pestana] = window.scrollY
+    setPestana(nueva)
+  }
+
   if (perfil === undefined) return <Cargando />
   if (perfil === null) return <SinAcceso />
 
+  // Las tres pantallas quedan montadas: al cambiar de pestaña no se pierde lo
+  // que se estaba escribiendo ni la búsqueda.
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 pb-32">
-        {pestana === 'registrar' && <Registrar perfil={perfil} />}
-        {pestana === 'cobrar' && <Cobrar perfil={perfil} />}
-        {pestana === 'ajustes' && <Ajustes perfil={perfil} />}
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-6 pb-[calc(var(--alto-pestanas)+env(safe-area-inset-bottom)+6rem)] sm:px-8">
+        <div hidden={pestana !== 'registrar'}>
+          <Registrar perfil={perfil} activa={pestana === 'registrar'} />
+        </div>
+        <div hidden={pestana !== 'cobrar'}>
+          <Cobrar perfil={perfil} activa={pestana === 'cobrar'} />
+        </div>
+        <div hidden={pestana !== 'ajustes'}>
+          <Ajustes perfil={perfil} />
+        </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 border-t-2 border-stone-200 bg-white pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-3xl grid-cols-3 gap-2 p-2">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <div className="mx-auto grid h-(--alto-pestanas) max-w-xl grid-cols-3 gap-2 px-3 py-1.5">
           {pestanas.map((p) => (
             <button
               key={p.id}
               type="button"
-              onClick={() => setPestana(p.id)}
+              onClick={() => cambiar(p.id)}
               aria-current={pestana === p.id ? 'page' : undefined}
-              className={`min-h-16 rounded-2xl text-lg font-semibold ${
-                pestana === p.id ? 'bg-amber-800 text-white' : 'text-stone-700 active:bg-stone-100'
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-xl text-base font-semibold ${
+                pestana === p.id ? 'bg-amber-50 text-amber-800' : 'text-stone-600 active:bg-stone-100'
               }`}
             >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-6 w-6 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"
+              >
+                {p.icono}
+              </svg>
               {p.titulo}
             </button>
           ))}
@@ -78,16 +132,14 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
 
 function Cargando() {
   return (
-    <div className="flex min-h-dvh items-center justify-center text-xl text-stone-500">
-      Cargando...
-    </div>
+    <div className="flex min-h-dvh items-center justify-center text-lg text-stone-600">Cargando...</div>
   )
 }
 
 function SinAcceso() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-6 px-5 text-center">
-      <p className="text-xl">Este usuario todavía no tiene permiso para usar La Cuenta.</p>
+      <p className="text-lg">Este usuario todavía no tiene permiso para usar La Cuenta.</p>
       <Boton variante="secundario" onClick={() => supabase.auth.signOut()}>
         Salir
       </Boton>

@@ -1,10 +1,10 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
+import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
+import { campo } from '../componentes/estilos'
 import { supabase } from '../lib/supabase'
 import type { Departamento } from '../lib/tipos'
-
-const campo = 'min-h-14 rounded-2xl border-2 border-stone-300 bg-white px-4'
 
 function mensajeDeError(error: PostgrestError): string {
   if (error.code === '23505') return 'Ya existe un departamento con ese nombre.'
@@ -60,7 +60,11 @@ export function Departamentos() {
   }
 
   if (lista === null) {
-    return <p className="text-lg text-stone-500">{error ?? 'Cargando departamentos...'}</p>
+    return error ? (
+      <ErrorDeCarga texto={error} onReintentar={cargar} />
+    ) : (
+      <p className="text-lg text-stone-600">Cargando departamentos...</p>
+    )
   }
 
   const activos = lista.filter((d) => d.activo)
@@ -68,7 +72,7 @@ export function Departamentos() {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="text-2xl font-bold">Departamentos</h2>
+      <h2 className="text-xl font-semibold">Departamentos</h2>
 
       {error && <p className="text-lg text-red-800">{error}</p>}
 
@@ -76,38 +80,37 @@ export function Departamentos() {
         <p className="text-lg text-stone-600">Todavía no hay departamentos. Agrega el primero.</p>
       )}
 
-      <ul className="flex flex-col gap-3">
-        {activos.map((d) =>
-          editando === d.id ? (
-            <EditarDepartamento
-              key={d.id}
-              departamento={d}
-              onGuardar={async (cambios) => {
-                if (await actualizar(d.id, cambios)) setEditando(null)
-              }}
-              onCancelar={() => setEditando(null)}
-            />
-          ) : (
-            <li
-              key={d.id}
-              className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-stone-200 bg-white p-4"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-xl font-semibold">{d.nombre}</p>
-                {d.alias.length > 0 && (
-                  <p className="text-base text-stone-500">También: {d.alias.join(', ')}</p>
-                )}
-              </div>
-              <Boton variante="secundario" onClick={() => setEditando(d.id)}>
-                Cambiar
-              </Boton>
-              <Boton variante="peligro" onClick={() => actualizar(d.id, { activo: false })}>
-                Archivar
-              </Boton>
-            </li>
-          ),
-        )}
-      </ul>
+      {activos.length > 0 && (
+        <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+          {activos.map((d) =>
+            editando === d.id ? (
+              <EditarDepartamento
+                key={d.id}
+                departamento={d}
+                onGuardar={async (cambios) => {
+                  if (await actualizar(d.id, cambios)) setEditando(null)
+                }}
+                onCancelar={() => setEditando(null)}
+              />
+            ) : (
+              <li key={d.id} className="flex flex-wrap items-center gap-3 py-2 pr-3 pl-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-lg font-semibold">{d.nombre}</p>
+                  {d.alias.length > 0 && (
+                    <p className="text-base text-stone-600">También: {d.alias.join(', ')}</p>
+                  )}
+                </div>
+                <Boton variante="secundario" compacto onClick={() => setEditando(d.id)}>
+                  Cambiar
+                </Boton>
+                <Boton variante="peligro" compacto onClick={() => actualizar(d.id, { activo: false })}>
+                  Archivar
+                </Boton>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
 
       <form onSubmit={agregar} className="flex flex-wrap gap-3">
         <input
@@ -117,25 +120,21 @@ export function Departamentos() {
           aria-label="Nombre del nuevo departamento"
           className={`${campo} min-w-0 flex-1`}
         />
-        <button
-          type="submit"
-          disabled={!nuevo.trim()}
-          className="min-h-14 rounded-2xl bg-amber-800 px-6 font-semibold text-white active:bg-amber-900 disabled:bg-stone-400"
-        >
+        <Boton type="submit" disabled={!nuevo.trim()}>
           Agregar
-        </button>
+        </Boton>
       </form>
 
       {archivados.length > 0 && (
-        <details className="rounded-2xl border-2 border-stone-200 bg-white p-4">
-          <summary className="cursor-pointer text-lg font-semibold text-stone-600">
+        <details className="rounded-xl border border-stone-200 bg-white p-4">
+          <summary className="min-h-11 cursor-pointer content-center text-lg font-semibold text-stone-600">
             Archivados ({archivados.length})
           </summary>
           <ul className="mt-3 flex flex-col gap-3">
             {archivados.map((d) => (
               <li key={d.id} className="flex items-center gap-3">
                 <span className="flex-1 text-lg text-stone-600">{d.nombre}</span>
-                <Boton variante="secundario" onClick={() => actualizar(d.id, { activo: true })}>
+                <Boton variante="secundario" compacto onClick={() => actualizar(d.id, { activo: true })}>
                   Reactivar
                 </Boton>
               </li>
@@ -166,14 +165,14 @@ function EditarDepartamento({
   }
 
   return (
-    <li className="rounded-2xl border-2 border-amber-700 bg-white p-4">
+    <li className="bg-amber-50 p-4">
       <form onSubmit={guardar} className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
-          <span className="font-semibold">Nombre</span>
+          <span className="text-base font-semibold text-stone-600">Nombre</span>
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={campo} />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="font-semibold">Otras formas de decirlo (separadas por coma)</span>
+          <span className="text-base font-semibold text-stone-600">Otras formas de decirlo (separadas por coma)</span>
           <input
             value={alias}
             onChange={(e) => setAlias(e.target.value)}
@@ -182,12 +181,7 @@ function EditarDepartamento({
           />
         </label>
         <div className="flex gap-3">
-          <button
-            type="submit"
-            className="min-h-14 rounded-2xl bg-amber-800 px-6 font-semibold text-white active:bg-amber-900"
-          >
-            Guardar
-          </button>
+          <Boton type="submit">Guardar</Boton>
           <Boton variante="secundario" onClick={onCancelar}>
             Cancelar
           </Boton>

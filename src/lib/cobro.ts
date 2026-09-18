@@ -11,16 +11,22 @@ export interface GrupoDeCobro {
 /**
  * La lista de cobro: quien debe o tiene saldo a favor, agrupada por el
  * departamento actual de cada persona, en orden alfabético. `busqueda` filtra
- * por nombre de persona o de departamento, sin importar tildes.
+ * por nombre de persona o de departamento, sin importar tildes. `mantener`
+ * son las personas que siguen en la lista aunque ya estén al día.
  */
-export function agruparParaCobro(saldos: Saldo[], busqueda = ''): GrupoDeCobro[] {
+export function agruparParaCobro(
+  saldos: Saldo[],
+  busqueda = '',
+  mantener: ReadonlySet<number> = new Set(),
+): GrupoDeCobro[] {
   const buscado = normalizarNombre(busqueda)
   const grupos = new Map<number, GrupoDeCobro>()
 
   for (const s of saldos) {
     // Al buscar se muestra también a quien está al día, para poder abrir su
-    // historial y anular un pago equivocado.
-    if (s.saldo === 0 && !buscado) continue
+    // historial y anular un pago equivocado. Quien acaba de pagar se queda
+    // en su sitio para que la lista no salte bajo el dedo.
+    if (s.saldo === 0 && !buscado && !mantener.has(s.persona_id)) continue
     if (
       buscado &&
       !normalizarNombre(s.nombre).includes(buscado) &&
