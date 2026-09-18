@@ -12,8 +12,8 @@ export function ErrorDeCarga({ texto, onReintentar }: { texto: string; onReinten
   }
 
   return (
-    <div role="alert" className="flex flex-col items-start gap-3 rounded-xl bg-red-50 p-4">
-      <p className="text-lg text-red-800">{texto}</p>
+    <div role="alert" className="flex flex-col items-start gap-3 rounded-xl bg-peligro-suave p-4">
+      <p className="text-lg text-peligro">{texto}</p>
       <Boton variante="secundario" onClick={reintentar} disabled={intentando}>
         {intentando ? 'Intentando...' : 'Intentar de nuevo'}
       </Boton>

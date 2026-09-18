@@ -26,7 +26,7 @@ export function Aviso({ aviso, onCerrar }: { aviso: DatosAviso | null; onCerrar:
           key={aviso.texto}
           role={aviso.tipo === 'error' ? 'alert' : 'status'}
           className={`pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-2xl py-2 pr-2 pl-5 shadow-[0_8px_24px_rgb(0_0_0/0.14)] motion-safe:animate-aparecer ${
-            aviso.tipo === 'ok' ? 'bg-stone-900 text-white' : 'bg-red-700 text-white'
+            aviso.tipo === 'ok' ? 'bg-tinta text-white' : 'bg-peligro text-white'
           }`}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 shrink-0 fill-none stroke-current stroke-2">
@@ -42,7 +42,7 @@ export function Aviso({ aviso, onCerrar }: { aviso: DatosAviso | null; onCerrar:
               type="button"
               onClick={deshacer}
               disabled={deshaciendo}
-              className="min-h-11 rounded-xl px-4 text-lg font-semibold text-amber-300 active:bg-white/10"
+              className="min-h-11 rounded-xl px-4 text-lg font-semibold text-destello active:bg-superficie/10"
             >
               {deshaciendo ? 'Deshaciendo...' : 'Deshacer'}
             </button>
@@ -50,7 +50,7 @@ export function Aviso({ aviso, onCerrar }: { aviso: DatosAviso | null; onCerrar:
             <button
               type="button"
               onClick={onCerrar}
-              className="min-h-11 rounded-xl px-4 text-lg font-semibold active:bg-white/10"
+              className="min-h-11 rounded-xl px-4 text-lg font-semibold active:bg-superficie/10"
             >
               Cerrar
             </button>

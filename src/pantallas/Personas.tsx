@@ -92,7 +92,7 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
     return errorDeCarga ? (
       <ErrorDeCarga texto="No se pudieron cargar las personas." onReintentar={cargar} />
     ) : (
-      <p className="text-lg text-stone-600">Cargando personas...</p>
+      <p className="text-lg text-tinta-suave">Cargando personas...</p>
     )
   }
 
@@ -104,12 +104,12 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-lg text-stone-600">
+      <p className="text-lg text-tinta-suave">
         Las personas que compran a crédito. También se crean solas al registrar una compra con un nombre nuevo.
       </p>
 
       {activos.length === 0 ? (
-        <p className="rounded-xl bg-amber-50 p-4 text-lg text-amber-900">
+        <p className="rounded-xl bg-info-suave p-4 text-lg text-info">
           Primero hay que crear un departamento, en Ajustes &gt; Departamentos.
         </p>
       ) : (
@@ -128,21 +128,21 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
         />
       )}
 
-      {activas.length === 0 && <p className="text-lg text-stone-600">Todavía no hay personas.</p>}
+      {activas.length === 0 && <p className="text-lg text-tinta-suave">Todavía no hay personas.</p>}
       {activas.length > 0 && grupos.length === 0 && (
-        <p className="text-lg text-stone-600">No hay nadie con ese nombre.</p>
+        <p className="text-lg text-tinta-suave">No hay nadie con ese nombre.</p>
       )}
 
       {grupos.map((g) => (
         <div key={g.departamento.id} className="flex flex-col gap-2">
           <h2 className="flex items-baseline gap-2 text-xl font-semibold">
             {g.departamento.nombre}
-            <span className="text-base font-normal text-stone-600">
+            <span className="text-base font-normal text-tinta-suave">
               · {g.personas.length} {g.personas.length === 1 ? 'persona' : 'personas'}
               {!g.departamento.activo && ' · departamento archivado'}
             </span>
           </h2>
-          <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
             {g.personas.map((p) =>
               editando === p.id ? (
                 <EditarPersona
@@ -174,14 +174,14 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
       ))}
 
       {archivadas.length > 0 && (
-        <details className="rounded-xl border border-stone-200 bg-white p-4">
-          <summary className="min-h-11 cursor-pointer content-center text-lg font-semibold text-stone-600">
+        <details className="rounded-xl border border-linea bg-superficie p-4">
+          <summary className="min-h-11 cursor-pointer content-center text-lg font-semibold text-tinta-suave">
             Archivadas ({archivadas.length})
           </summary>
           <ul className="mt-3 flex flex-col gap-3">
             {archivadas.map((p) => (
               <li key={p.id} className="flex items-center gap-3">
-                <span className="flex-1 text-lg text-stone-600">
+                <span className="flex-1 text-lg text-tinta-suave">
                   {p.nombre} <span className="text-base">· {nombreDepto(p.departamento_id)}</span>
                 </span>
                 <Boton variante="secundario" compacto onClick={() => reactivar(p)}>
@@ -228,7 +228,7 @@ function AgregarPersona({
   }
 
   return (
-    <form onSubmit={agregar} className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4">
+    <form onSubmit={agregar} className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4">
       <span className="text-lg font-semibold">Agregar persona</span>
       <div className="grid gap-3 sm:grid-cols-[3fr_2fr]">
         <input
@@ -285,15 +285,15 @@ function EditarPersona({
   }
 
   return (
-    <li className="bg-amber-50 p-4">
+    <li className="bg-marca-suave p-4">
       <form onSubmit={guardar} className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-[3fr_2fr]">
           <label className="flex flex-col gap-1">
-            <span className="text-base font-semibold text-stone-600">Nombre</span>
+            <span className="text-base font-semibold text-tinta-suave">Nombre</span>
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" className={campo} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-base font-semibold text-stone-600">Departamento</span>
+            <span className="text-base font-semibold text-tinta-suave">Departamento</span>
             <select value={departamentoId} onChange={(e) => setDepartamentoId(Number(e.target.value))} className={campo}>
               {departamentos.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -303,7 +303,7 @@ function EditarPersona({
             </select>
           </label>
         </div>
-        <p className="text-base text-stone-600">
+        <p className="text-base text-tinta-suave">
           Las compras que ya hizo quedan con el departamento de ese momento.
         </p>
         <div className="flex justify-end gap-3">

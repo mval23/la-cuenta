@@ -102,7 +102,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
         </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-linea bg-superficie/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="mx-auto grid h-(--alto-pestanas) max-w-xl grid-cols-3 gap-2 px-3 py-1.5">
           {pestanas.map((p) => (
             <button
@@ -111,7 +111,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
               onClick={() => cambiar(p.id)}
               aria-current={pestana === p.id ? 'page' : undefined}
               className={`flex flex-col items-center justify-center gap-0.5 rounded-xl text-base font-semibold ${
-                pestana === p.id ? 'bg-amber-50 text-amber-800' : 'text-stone-600 active:bg-stone-100'
+                pestana === p.id ? 'bg-marca-suave text-marca' : 'text-tinta-suave active:bg-hundido'
               }`}
             >
               <svg
@@ -132,7 +132,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
 
 function Cargando() {
   return (
-    <div className="flex min-h-dvh items-center justify-center text-lg text-stone-600">Cargando...</div>
+    <div className="flex min-h-dvh items-center justify-center text-lg text-tinta-suave">Cargando...</div>
   )
 }
 

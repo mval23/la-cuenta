@@ -85,19 +85,19 @@ function Inicio({
 
   return (
     <>
-      <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+      <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
         {filas.map((f) => (
           <li key={f.seccion}>
             <button
               type="button"
               onClick={() => onIr(f.seccion)}
-              className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left active:bg-stone-100"
+              className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left active:bg-hundido"
             >
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-lg font-semibold">{f.titulo}</span>
-                <span className="text-base text-stone-600">{f.detalle}</span>
+                <span className="text-base text-tinta-suave">{f.detalle}</span>
               </span>
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-stone-400 stroke-2">
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-tinta-tenue stroke-2">
                 <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
@@ -105,11 +105,11 @@ function Inicio({
         ))}
       </ul>
 
-      <div className="flex flex-col gap-3 border-t border-stone-200 pt-6">
-        <p className="text-lg text-stone-600">Usuaria: {perfil.nombre}</p>
+      <div className="flex flex-col gap-3 border-t border-linea pt-6">
+        <p className="text-lg text-tinta-suave">Usuaria: {perfil.nombre}</p>
         {saliendo ? (
           // Para volver a entrar hace falta el PIN: mejor preguntar antes.
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-amber-50 p-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
             <span className="mr-auto text-lg">¿Cerrar sesión? Para volver a entrar se necesita el PIN.</span>
             <Boton variante="secundario" compacto onClick={() => setSaliendo(false)}>
               No

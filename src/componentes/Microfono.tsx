@@ -70,9 +70,9 @@ export function Microfono({
   }
 
   const estilos: Record<Estado, string> = {
-    lista: 'bg-amber-800 text-white active:bg-amber-900',
-    grabando: 'bg-red-700 text-white active:bg-red-800',
-    procesando: 'bg-stone-200 text-stone-700',
+    lista: 'bg-marca text-white active:bg-marca-oscura',
+    grabando: 'bg-peligro text-white active:bg-peligro-oscuro',
+    procesando: 'bg-hundido text-tinta-suave',
   }
   const textos: Record<Estado, string> = {
     lista: 'Tocar para hablar',

@@ -188,7 +188,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     return errorDeCarga ? (
       <ErrorDeCarga texto="No se pudieron cargar los departamentos." onReintentar={cargarDepartamentos} />
     ) : (
-      <p className="text-lg text-stone-600">Cargando...</p>
+      <p className="text-lg text-tinta-suave">Cargando...</p>
     )
   }
 
@@ -199,7 +199,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
         <h1 className="text-titulo font-bold">Registrar</h1>
 
         {departamentos.length === 0 && (
-          <p className="rounded-xl bg-amber-50 p-4 text-lg text-amber-900">
+          <p className="rounded-xl bg-info-suave p-4 text-lg text-info">
             Primero hay que crear los departamentos, en Ajustes &gt; Departamentos.
           </p>
         )}
@@ -227,7 +227,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                 onEmpezar={cerrar}
               />
             )}
-            <label htmlFor="frase" className="pt-1 text-base text-stone-600">
+            <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
               O escríbelo. Por ejemplo: Juan TDH almuerzo a 10 mil
             </label>
             <div className="flex gap-3">
@@ -273,19 +273,19 @@ function AyudaDictado() {
         {abierta ? 'Ocultar la ayuda' : '¿Cómo se dicta?'}
       </Boton>
       {abierta && (
-        <div className="flex w-full flex-col gap-3 rounded-xl bg-stone-100 p-4">
+        <div className="flex w-full flex-col gap-3 rounded-xl bg-hundido p-4">
           <p className="text-lg">
             Se dice en este orden: <strong>quién</strong>, <strong>de qué departamento</strong>,{' '}
             <strong>qué llevó</strong> y <strong>cuánto</strong>.
           </p>
           <ul className="flex flex-col gap-1.5">
             {EJEMPLOS.map((ejemplo) => (
-              <li key={ejemplo} className="rounded-lg bg-white px-3 py-2 text-lg">
+              <li key={ejemplo} className="rounded-lg bg-superficie px-3 py-2 text-lg">
                 «{ejemplo}»
               </li>
             ))}
           </ul>
-          <p className="text-base text-stone-600">
+          <p className="text-base text-tinta-suave">
             Antes de guardar siempre aparece la tarjeta para revisar y corregir. Si hay dos personas con
             el mismo nombre, la app pregunta cuál es.
           </p>
@@ -351,16 +351,16 @@ function Confirmacion({
   }
 
   return (
-    <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="text-base text-stone-600">Se entendió: «{b.textoOriginal}»</p>
+    <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-linea bg-superficie p-5 shadow-sm">
+      <p className="text-base text-tinta-suave">Se entendió: «{b.textoOriginal}»</p>
 
       <div className="flex flex-col gap-2">
-        <span className="text-base font-semibold text-stone-600">Quién</span>
+        <span className="text-base font-semibold text-tinta-suave">Quién</span>
         {elegida ? (
           <div className="flex items-center gap-3">
             <p className="flex-1 text-xl font-semibold">
               {elegida.nombre}{' '}
-              <span className="font-normal text-stone-600">· {nombreDepto(elegida.departamento_id)}</span>
+              <span className="font-normal text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
             </p>
             <Boton
               variante="secundario"
@@ -378,7 +378,7 @@ function Confirmacion({
           </div>
         ) : personaNueva ? (
           <>
-            <p className="text-base text-stone-600">Persona nueva. Revisa el nombre y el departamento:</p>
+            <p className="text-base text-tinta-suave">Persona nueva. Revisa el nombre y el departamento:</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 value={b.nombreNuevo}
@@ -410,17 +410,17 @@ function Confirmacion({
           </>
         ) : (
           <>
-            <p className="text-base text-stone-600">¿Es alguna de estas personas?</p>
+            <p className="text-base text-tinta-suave">¿Es alguna de estas personas?</p>
             <div className="flex flex-col gap-2">
               {b.candidatas.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => cambiar({ personaId: p.id })}
-                  className="min-h-12 rounded-xl border border-stone-300 px-4 text-left text-lg active:bg-stone-100"
+                  className="min-h-12 rounded-xl border border-control px-4 text-left text-lg active:bg-hundido"
                 >
                   <span className="font-semibold">{p.nombre}</span>{' '}
-                  <span className="text-stone-600">· {nombreDepto(p.departamento_id)}</span>
+                  <span className="text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
                 </button>
               ))}
             </div>
@@ -433,7 +433,7 @@ function Confirmacion({
 
       <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-stone-600">
+          <span className="text-base font-semibold text-tinta-suave">
             Qué <span className="font-normal">(opcional)</span>
           </span>
           <input
@@ -444,7 +444,7 @@ function Confirmacion({
           />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-stone-600">Cuánto</span>
+          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
           <input
             ref={campoValor}
             value={b.valor}
@@ -460,12 +460,12 @@ function Confirmacion({
       </div>
 
       {preguntando ? (
-        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-amber-50 p-4">
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-aviso-suave p-4">
           <div className="mr-auto">
             <p className="text-xl font-semibold">
               ¿Seguro que son <span className="tabular-nums">{formatearPesos(valor)}</span>?
             </p>
-            <p className="text-base text-amber-900">
+            <p className="text-base text-aviso">
               {inusual === 'bajo'
                 ? 'Parece poco para una compra. ¿Faltó decir "mil"?'
                 : 'Parece mucho para una compra.'}
@@ -479,10 +479,10 @@ function Confirmacion({
           </Boton>
         </div>
       ) : (
-      <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
+      <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-4">
         <div className="mr-auto">
           <p className="text-3xl font-bold tabular-nums">{valor > 0 ? formatearPesos(valor) : '$ —'}</p>
-          {!listo && <p className="text-base text-amber-900">Falta: {faltan.join(', ')}.</p>}
+          {!listo && <p className="text-base text-aviso">Falta: {faltan.join(', ')}.</p>}
         </div>
         <Boton variante="secundario" onClick={onCancelar}>
           Cancelar
@@ -509,7 +509,7 @@ function ComprasDeHoy({
 }) {
   const [confirmando, setConfirmando] = useState<number | null>(null)
   if (compras.length === 0) {
-    return <p className="pt-3 text-lg text-stone-600 ancha:pt-1">Hoy todavía no se ha registrado nada.</p>
+    return <p className="pt-3 text-lg text-tinta-suave ancha:pt-1">Hoy todavía no se ha registrado nada.</p>
   }
 
   const vigentes = compras.filter((c) => !c.anulada)
@@ -519,31 +519,31 @@ function ComprasDeHoy({
     <div className="flex flex-col gap-2 pt-3 ancha:pt-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-xl font-semibold">
-          Hoy <span className="text-base font-normal text-stone-600">
+          Hoy <span className="text-base font-normal text-tinta-suave">
             · {vigentes.length} {vigentes.length === 1 ? 'compra' : 'compras'}
           </span>
         </h2>
         <span className="text-lg font-semibold tabular-nums">{formatearPesos(total)}</span>
       </div>
-      <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+      <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
         {compras.map((c) => (
           <li key={c.id}>
             <div className="flex items-center gap-3 py-2 pr-3 pl-4">
-              <div className={`min-w-0 flex-1 ${c.anulada ? 'text-stone-500 line-through' : ''}`}>
+              <div className={`min-w-0 flex-1 ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
                 <p className="text-lg">
                   <span className="font-semibold">{c.personas?.nombre}</span>{' '}
-                  <span className={c.anulada ? '' : 'text-stone-600'}>· {c.departamentos?.nombre}</span>
+                  <span className={c.anulada ? '' : 'text-tinta-suave'}>· {c.departamentos?.nombre}</span>
                 </p>
-                <p className={`text-base ${c.anulada ? '' : 'text-stone-600'}`}>
+                <p className={`text-base ${c.anulada ? '' : 'text-tinta-suave'}`}>
                   {c.descripcion && `${c.descripcion} · `}
                   {hora(c.creada_en)}
                 </p>
               </div>
-              <span className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-stone-500 line-through' : ''}`}>
+              <span className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
                 {formatearPesos(c.valor_pesos)}
               </span>
               {c.anulada ? (
-                <span className="w-24 text-center text-base text-stone-600">Anulada</span>
+                <span className="w-24 text-center text-base text-tinta-suave">Anulada</span>
               ) : (
                 puedeAnular && (
                   <Boton
@@ -559,7 +559,7 @@ function ComprasDeHoy({
               )}
             </div>
             {confirmando === c.id && (
-              <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-red-50 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
                 <span className="mr-auto text-lg">¿Anular esta compra?</span>
                 <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
                   No
