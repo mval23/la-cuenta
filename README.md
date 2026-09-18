@@ -22,6 +22,12 @@ Es una aplicación web instalable (PWA) pensada para usarse en iPad, con letra y
 
 El esquema está en `supabase/migrations/` y sus pruebas en `supabase/tests/`.
 
+## Voz
+
+El iPad graba el audio y lo envía a `api/transcribir.ts`, una función de Vercel que lo pasa a texto con Groq Whisper (`whisper-large-v3`). Le manda como pista los nombres de departamentos y personas para que los escriba bien. La función solo atiende a usuarias con sesión de Supabase. El texto pasa por el mismo lector de frases que cuando se escribe a mano, y siempre se confirma antes de guardar.
+
+`npm run dev` también atiende las funciones de `api/`, así que en local basta con poner `GROQ_API_KEY` en `.env.local`.
+
 ## Desarrollo local
 
 ```bash
@@ -57,7 +63,7 @@ npm test
 ### 2. Vercel
 
 1. Importar el repositorio de GitHub. Vercel detecta Vite solo.
-2. Agregar las variables de entorno `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_USUARIAS` (por ejemplo `Amparo:correo-de-amparo,Mariana:correo-de-mariana`).
+2. Agregar las variables de entorno `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_USUARIAS` (por ejemplo `Amparo:correo-de-amparo,Mariana:correo-de-mariana`), y `GROQ_API_KEY` (la clave de console.groq.com; esta no lleva `VITE_` para que nunca llegue a la app).
 3. Publicar.
 
 ### 3. iPad
@@ -65,3 +71,32 @@ npm test
 1. Abrir la dirección de Vercel en Safari, tocar el nombre y escribir el PIN.
 2. Tocar **Compartir > Agregar a pantalla de inicio**.
 3. Abrir siempre desde el ícono. La sesión queda guardada y no hay que volver a escribir el PIN.
+
+### 4. Respaldo diario
+
+`.github/workflows/respaldo.yml` corre todos los días a las 3:00 a. m. (hora de Colombia) y guarda un respaldo por 90 días en la pestaña **Actions** del repositorio. Si falla, GitHub envía un correo.
+
+1. En Supabase, botón **Connect** arriba, copiar la cadena de **Session pooler** (los servidores de GitHub no llegan a la conexión directa). Se ve así: `postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:5432/postgres`. Cambiar `[YOUR-PASSWORD]` por la contraseña de la base de datos.
+2. En GitHub, **Settings > Secrets and variables > Actions > New repository secret**: nombre `SUPABASE_DB_URL`, valor la cadena del paso anterior.
+3. En **Actions > Respaldo diario > Run workflow**, correrlo una vez para confirmar que funciona.
+
+Cada respaldo trae:
+
+- `la-cuenta.dump`: la base completa (esquema `public`).
+- `usuarias.dump`: las cuentas de entrada (`auth.users`), con sus PIN cifrados.
+- `csv/`: cada tabla en CSV, más `saldos.csv` con lo que debe cada persona. Se abren en Excel.
+
+Para restaurar en el mismo proyecto (por ejemplo, si se dañaron datos):
+
+```bash
+pg_restore --no-owner --no-privileges --clean --if-exists -d "<cadena-de-conexión>" la-cuenta.dump
+```
+
+Para restaurar en un proyecto nuevo, primero las usuarias y después el resto, porque las compras y los pagos guardan quién los registró. Así los PIN siguen funcionando:
+
+```bash
+pg_restore --data-only --no-owner -d "<cadena-de-conexión>" usuarias.dump
+pg_restore --no-owner --no-privileges -d "<cadena-de-conexión>" la-cuenta.dump
+```
+
+Esto no se ha ensayado todavía. Conviene probarlo una vez en un proyecto de Supabase aparte.

@@ -1,0 +1,102 @@
+# Respaldo diario de la base de datos de La Cuenta.
+#
+# Cada noche saca una copia completa del esquema public (restaurable con
+# pg_restore) y CSVs de cada tabla que se abren en Excel, y los guarda como
+# archivo de esta ejecución durante 90 días. Si falla, GitHub avisa por correo.
+#
+# Necesita el secreto SUPABASE_DB_URL (ver README, "Respaldo diario").
+
+name: Respaldo diario
+
+on:
+  schedule:
+    # 3:00 a. m. en Colombia (8:00 UTC).
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Revisar que exista el secreto
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Falta el secreto SUPABASE_DB_URL en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Instalar pg_dump de la misma versión que la base
+        run: |
+          # pg_dump no puede respaldar una base más nueva que él mismo.
+          version=$(psql "$DB_URL" -tAc "select current_setting('server_version_num')::int / 10000")
+          echo "Postgres del servidor: $version"
+          sudo apt-get install -y -qq postgresql-common > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq "postgresql-client-$version" > /dev/null
+          echo "/usr/lib/postgresql/$version/bin" >> "$GITHUB_PATH"
+
+      - name: Sacar el respaldo
+        run: |
+          fecha=$(TZ=America/Bogota date +%F)
+          carpeta="la-cuenta-$fecha"
+          mkdir -p "$carpeta/csv"
+          echo "CARPETA=$carpeta" >> "$GITHUB_ENV"
+
+          pg_dump --version
+          pg_dump "$DB_URL" --schema=public --no-owner --no-privileges \
+            --format=custom --file="$carpeta/la-cuenta.dump"
+          # Las compras y pagos apuntan a quién los registró (auth.users). Para
+          # restaurar en un proyecto nuevo hay que traer también las usuarias.
+          pg_dump "$DB_URL" --table=auth.users --data-only --no-owner --no-privileges \
+            --format=custom --file="$carpeta/usuarias.dump"
+
+          for tabla in perfiles departamentos personas compras pagos; do
+            psql "$DB_URL" -v ON_ERROR_STOP=1 \
+              -c "copy (select * from public.$tabla order by 1) to stdout with csv header" \
+              > "$carpeta/csv/$tabla.csv"
+          done
+
+          # Los saldos se calculan aquí porque la vista `saldos` solo responde
+          # a usuarias de la app.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "copy (
+            select d.nombre as departamento, p.nombre, p.activo,
+                   coalesce(c.total, 0) as comprado,
+                   coalesce(pg.total, 0) as pagado,
+                   coalesce(c.total, 0) - coalesce(pg.total, 0) as saldo
+            from public.personas p
+            join public.departamentos d on d.id = p.departamento_id
+            left join (select persona_id, sum(valor_pesos) as total from public.compras
+                       where not anulada group by persona_id) c on c.persona_id = p.id
+            left join (select persona_id, sum(valor_pesos) as total from public.pagos
+                       where not anulado group by persona_id) pg on pg.persona_id = p.id
+            order by d.nombre, p.nombre
+          ) to stdout with csv header" > "$carpeta/csv/saldos.csv"
+
+      - name: Verificar el respaldo
+        run: |
+          # Un respaldo que no se puede leer no sirve: se lista su contenido y
+          # se exige que traiga las tablas principales.
+          pg_restore --list "$CARPETA/la-cuenta.dump" > contenido.txt
+          for tabla in departamentos personas compras pagos; do
+            grep -qE "TABLE DATA public $tabla( |$)" contenido.txt || {
+              echo "::error::El respaldo no trae la tabla $tabla."
+              exit 1
+            }
+          done
+          ls -la "$CARPETA" "$CARPETA/csv"
+          echo "Compras: $(($(wc -l < "$CARPETA/csv/compras.csv") - 1))"
+          echo "Pagos: $(($(wc -l < "$CARPETA/csv/pagos.csv") - 1))"
+
+      - name: Guardar el respaldo
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CARPETA }}
+          path: ${{ env.CARPETA }}
+          retention-days: 90
+          if-no-files-found: error
