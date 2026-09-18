@@ -77,7 +77,7 @@ export function DetallePersona({
           id: c.id,
           fecha: c.fecha,
           creado: c.creada_en,
-          texto: c.descripcion,
+          texto: c.descripcion ?? 'Compra',
           valor: c.valor_pesos,
           anulado: c.anulada,
         })),

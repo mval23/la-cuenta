@@ -25,7 +25,7 @@ interface Borrador {
 
 interface CompraDeHoy {
   id: number
-  descripcion: string
+  descripcion: string | null
   valor_pesos: number
   anulada: boolean
   creada_en: string
@@ -121,7 +121,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
       .from('compras')
       .insert({
         persona_id: personaId,
-        descripcion: b.descripcion.trim(),
+        descripcion: b.descripcion.trim() || null,
         valor_pesos: Number(b.valor),
         texto_original: b.textoOriginal,
       })
@@ -135,7 +135,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     const nombre = persona?.nombre ?? b.nombreNuevo.trim()
     mostrar({
       tipo: 'ok',
-      texto: `Guardado: ${nombre}, ${b.descripcion.trim()}, ${formatearPesos(Number(b.valor))}`,
+      texto: `Guardado: ${[nombre, b.descripcion.trim(), formatearPesos(Number(b.valor))].filter(Boolean).join(', ')}`,
       deshacer: puedeAnular ? () => cambiarAnulada(data.id, true, 'Se deshizo la compra.') : undefined,
     })
     setBorrador(null)
@@ -179,7 +179,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     }
     mostrar({
       tipo: 'ok',
-      texto: `Se anuló: ${c.personas?.nombre ?? ''}, ${c.descripcion}, ${formatearPesos(c.valor_pesos)}`,
+      texto: `Se anuló: ${[c.personas?.nombre, c.descripcion, formatearPesos(c.valor_pesos)].filter(Boolean).join(', ')}`,
       deshacer: () => cambiarAnulada(c.id, false, 'Se recuperó la compra.'),
     })
   }
@@ -324,7 +324,6 @@ function Confirmacion({
   const faltan = [
     !(elegida !== null || (personaNueva && b.nombreNuevo.trim() !== '' && b.departamentoId !== null)) &&
       (personaNueva ? 'nombre y departamento' : 'elegir quién'),
-    b.descripcion.trim() === '' && 'qué compró',
     !(valor > 0) && 'cuánto',
   ].filter((f): f is string => typeof f === 'string')
   const listo = faltan.length === 0
@@ -434,7 +433,9 @@ function Confirmacion({
 
       <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-stone-600">Qué</span>
+          <span className="text-base font-semibold text-stone-600">
+            Qué <span className="font-normal">(opcional)</span>
+          </span>
           <input
             value={b.descripcion}
             onChange={(e) => cambiar({ descripcion: e.target.value })}
@@ -534,7 +535,8 @@ function ComprasDeHoy({
                   <span className={c.anulada ? '' : 'text-stone-600'}>· {c.departamentos?.nombre}</span>
                 </p>
                 <p className={`text-base ${c.anulada ? '' : 'text-stone-600'}`}>
-                  {c.descripcion} · {hora(c.creada_en)}
+                  {c.descripcion && `${c.descripcion} · `}
+                  {hora(c.creada_en)}
                 </p>
               </div>
               <span className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-stone-500 line-through' : ''}`}>
