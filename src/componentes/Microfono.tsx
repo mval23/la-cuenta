@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { empezarGrabacion, ErrorDeVoz, hayMicrofono, transcribir, type Grabacion } from '../lib/voz'
+import {
+  DURACION_MAXIMA_MS,
+  empezarGrabacion,
+  ErrorDeVoz,
+  hayMicrofono,
+  transcribir,
+  type Grabacion,
+} from '../lib/voz'
 
 type Estado = 'lista' | 'grabando' | 'procesando'
 
@@ -21,12 +28,25 @@ export function Microfono({
   // Si se cambia de pestaña mientras graba, se apaga el micrófono.
   useEffect(() => () => grabacion.current?.cancelar(), [])
 
+  // Reloj de la grabación, para avisar antes de que se corte sola.
+  const [inicio, setInicio] = useState(0)
+  const [ahora, setAhora] = useState(0)
+  useEffect(() => {
+    if (estado !== 'grabando') return
+    const reloj = window.setInterval(() => setAhora(Date.now()), 1000)
+    return () => window.clearInterval(reloj)
+  }, [estado])
+  const quedan = Math.max(0, Math.round((DURACION_MAXIMA_MS - (ahora - inicio)) / 1000))
+
   if (!hayMicrofono()) return null
 
   async function empezar() {
     onEmpezar()
     try {
       grabacion.current = await empezarGrabacion(() => terminar())
+      const momento = Date.now()
+      setInicio(momento)
+      setAhora(momento)
       setEstado('grabando')
     } catch {
       onError('No se pudo usar el micrófono. Revisa que La Cuenta tenga permiso en Ajustes del iPad.')
@@ -76,7 +96,12 @@ export function Microfono({
           <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" strokeLinecap="round" />
         </svg>
       )}
-      {textos[estado]}
+      <span className="flex flex-col items-start">
+        {textos[estado]}
+        {estado === 'grabando' && quedan <= 10 && (
+          <span className="text-base font-normal">Se detiene sola en {quedan} s</span>
+        )}
+      </span>
     </button>
   )
 }

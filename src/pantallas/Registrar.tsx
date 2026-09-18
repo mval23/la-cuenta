@@ -8,7 +8,7 @@ import { Microfono } from '../componentes/Microfono'
 import { leerDictado } from '../lib/dictado'
 import { hora, hoyBogota } from '../lib/fechas'
 import { normalizarNombre, resolverPersona, vocabulario } from '../lib/personas'
-import { formatearPesos } from '../lib/pesos'
+import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Departamento, Perfil, Persona } from '../lib/tipos'
 
@@ -244,6 +244,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                 Seguir
               </Boton>
             </div>
+            <AyudaDictado />
           </form>
         )}
       </div>
@@ -252,6 +253,45 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
 
       <Aviso aviso={aviso} onCerrar={cerrar} />
     </section>
+  )
+}
+
+// Ayuda para dictar -----------------------------------------------------------
+
+const EJEMPLOS = [
+  'Juan TDH almuerzo a 10 mil',
+  'María José Bodega bandeja paisa y jugo por 18 mil',
+  'Pedro de Mantenimiento un tinto a mil quinientos',
+]
+
+function AyudaDictado() {
+  const [abierta, setAbierta] = useState(false)
+
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <Boton variante="texto" compacto className="-ml-4" aria-expanded={abierta} onClick={() => setAbierta(!abierta)}>
+        {abierta ? 'Ocultar la ayuda' : '¿Cómo se dicta?'}
+      </Boton>
+      {abierta && (
+        <div className="flex w-full flex-col gap-3 rounded-xl bg-stone-100 p-4">
+          <p className="text-lg">
+            Se dice en este orden: <strong>quién</strong>, <strong>de qué departamento</strong>,{' '}
+            <strong>qué llevó</strong> y <strong>cuánto</strong>.
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {EJEMPLOS.map((ejemplo) => (
+              <li key={ejemplo} className="rounded-lg bg-white px-3 py-2 text-lg">
+                «{ejemplo}»
+              </li>
+            ))}
+          </ul>
+          <p className="text-base text-stone-600">
+            Antes de guardar siempre aparece la tarjeta para revisar y corregir. Si hay dos personas con
+            el mismo nombre, la app pregunta cuál es.
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -288,10 +328,24 @@ function Confirmacion({
     !(valor > 0) && 'cuánto',
   ].filter((f): f is string => typeof f === 'string')
   const listo = faltan.length === 0
+  // Un valor raro (casi siempre un "mil" que se perdió) se confirma antes de guardar.
+  const [preguntando, setPreguntando] = useState(false)
+  const inusual = valorInusual(valor)
+  const campoValor = useRef<HTMLInputElement>(null)
+
+  function corregirValor() {
+    setPreguntando(false)
+    campoValor.current?.focus()
+    campoValor.current?.select()
+  }
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
     if (!listo || guardando) return
+    if (inusual && !preguntando) {
+      setPreguntando(true)
+      return
+    }
     setGuardando(true)
     await onGuardar(b)
     setGuardando(false)
@@ -391,8 +445,12 @@ function Confirmacion({
         <label className="flex flex-col gap-2">
           <span className="text-base font-semibold text-stone-600">Cuánto</span>
           <input
+            ref={campoValor}
             value={b.valor}
-            onChange={(e) => cambiar({ valor: soloDigitos(e.target.value) })}
+            onChange={(e) => {
+              setPreguntando(false)
+              cambiar({ valor: soloDigitos(e.target.value) })
+            }}
             inputMode="numeric"
             autoComplete="off"
             className={`${campo} tabular-nums`}
@@ -400,6 +458,26 @@ function Confirmacion({
         </label>
       </div>
 
+      {preguntando ? (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-amber-50 p-4">
+          <div className="mr-auto">
+            <p className="text-xl font-semibold">
+              ¿Seguro que son <span className="tabular-nums">{formatearPesos(valor)}</span>?
+            </p>
+            <p className="text-base text-amber-900">
+              {inusual === 'bajo'
+                ? 'Parece poco para una compra. ¿Faltó decir "mil"?'
+                : 'Parece mucho para una compra.'}
+            </p>
+          </div>
+          <Boton variante="secundario" onClick={corregirValor}>
+            Corregir
+          </Boton>
+          <Boton type="submit" disabled={guardando}>
+            {guardando ? 'Guardando...' : `Sí, son ${formatearPesos(valor)}`}
+          </Boton>
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
         <div className="mr-auto">
           <p className="text-3xl font-bold tabular-nums">{valor > 0 ? formatearPesos(valor) : '$ —'}</p>
@@ -412,6 +490,7 @@ function Confirmacion({
           {guardando ? 'Guardando...' : 'Guardar'}
         </Boton>
       </div>
+      )}
     </form>
   )
 }
