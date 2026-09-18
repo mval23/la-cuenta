@@ -23,7 +23,7 @@ export function Login() {
 function Elegir({ elegir }: { elegir: (u: Usuaria) => void }) {
   if (usuarias.length === 0) {
     return (
-      <p className="text-center text-lg text-red-800">
+      <p className="text-center text-lg text-peligro">
         Falta configurar VITE_USUARIAS. Revisa .env.example.
       </p>
     )
@@ -37,7 +37,7 @@ function Elegir({ elegir }: { elegir: (u: Usuaria) => void }) {
           key={u.correo}
           type="button"
           onClick={() => elegir(u)}
-          className="min-h-14 rounded-xl bg-amber-800 text-xl font-semibold text-white active:bg-amber-900"
+          className="min-h-14 rounded-xl bg-marca text-xl font-semibold text-white active:bg-marca-oscura"
         >
           {u.nombre}
         </button>
@@ -83,7 +83,7 @@ function Pin({ usuaria, volver }: { usuaria: Usuaria; volver: () => void }) {
 
   const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
   const estiloTecla =
-    'min-h-16 rounded-xl border border-stone-300 bg-white text-2xl font-semibold tabular-nums active:bg-stone-100 disabled:text-stone-400'
+    'min-h-16 rounded-xl border border-control bg-superficie text-2xl font-semibold tabular-nums active:bg-hundido disabled:text-tinta-tenue'
 
   return (
     <div className="flex flex-col gap-5">
@@ -93,15 +93,15 @@ function Pin({ usuaria, volver }: { usuaria: Usuaria; volver: () => void }) {
         {Array.from({ length: LARGO_PIN }, (_, i) => (
           <span
             key={i}
-            className={`h-6 w-6 rounded-full border-2 border-amber-800 ${
-              i < pin.length ? 'bg-amber-800' : ''
+            className={`h-6 w-6 rounded-full border-2 border-marca ${
+              i < pin.length ? 'bg-marca' : ''
             }`}
           />
         ))}
       </div>
 
-      <p className="min-h-7 text-center text-lg text-red-800" role="alert">
-        {entrando ? <span className="text-stone-600">Entrando...</span> : error}
+      <p className="min-h-7 text-center text-lg text-peligro" role="alert">
+        {entrando ? <span className="text-tinta-suave">Entrando...</span> : error}
       </p>
 
       <div className="grid grid-cols-3 gap-3">

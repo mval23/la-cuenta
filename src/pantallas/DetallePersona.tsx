@@ -143,7 +143,7 @@ export function DetallePersona({
         <div className="flex items-start justify-between gap-4">
           <div>
             <Titulo className="text-titulo font-bold">{s.nombre}</Titulo>
-            <p className="text-lg text-stone-600">{s.departamento}</p>
+            <p className="text-lg text-tinta-suave">{s.departamento}</p>
           </div>
           {enPanel && (
             <Boton variante="texto" compacto className="-mr-3" onClick={onVolver}>
@@ -151,7 +151,7 @@ export function DetallePersona({
             </Boton>
           )}
         </div>
-        <p className={`text-3xl font-bold tabular-nums ${aFavor || s.saldo === 0 ? 'text-green-800' : ''}`}>
+        <p className={`text-3xl font-bold tabular-nums ${aFavor || s.saldo === 0 ? 'text-exito' : ''}`}>
           {aFavor
             ? `A favor ${formatearPesos(-s.saldo)}`
             : s.saldo === 0
@@ -161,32 +161,32 @@ export function DetallePersona({
       </div>
 
       {errorDeCarga && <ErrorDeCarga texto="No se pudo cargar el historial." onReintentar={cargar} />}
-      {movimientos === null && !errorDeCarga && <p className="text-lg text-stone-600">Cargando...</p>}
+      {movimientos === null && !errorDeCarga && <p className="text-lg text-tinta-suave">Cargando...</p>}
       {movimientos?.length === 0 && (
-        <p className="text-lg text-stone-600">No hay movimientos en los últimos {DIAS_DE_HISTORIAL} días.</p>
+        <p className="text-lg text-tinta-suave">No hay movimientos en los últimos {DIAS_DE_HISTORIAL} días.</p>
       )}
 
       {movimientos && movimientos.length > 0 && (
-        <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+        <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
           {movimientos.map((m) => {
             const esPago = m.tabla === 'pagos'
             return (
               <li key={m.clave}>
                 <div className="flex items-center gap-3 py-2 pr-3 pl-4">
-                  <div className={`min-w-0 flex-1 ${m.anulado ? 'text-stone-500 line-through' : ''}`}>
-                    <p className={`text-lg ${esPago && !m.anulado ? 'font-semibold text-green-800' : ''}`}>{m.texto}</p>
-                    <p className="text-base text-stone-600">{fechaCorta(m.fecha)}</p>
+                  <div className={`min-w-0 flex-1 ${m.anulado ? 'text-tinta-tenue line-through' : ''}`}>
+                    <p className={`text-lg ${esPago && !m.anulado ? 'font-semibold text-exito' : ''}`}>{m.texto}</p>
+                    <p className="text-base text-tinta-suave">{fechaCorta(m.fecha)}</p>
                   </div>
                   <span
                     className={`text-lg font-semibold tabular-nums ${
-                      m.anulado ? 'text-stone-500 line-through' : esPago ? 'text-green-800' : ''
+                      m.anulado ? 'text-tinta-tenue line-through' : esPago ? 'text-exito' : ''
                     }`}
                   >
                     {esPago ? '−' : ''}
                     {formatearPesos(m.valor)}
                   </span>
                   {m.anulado ? (
-                    <span className="w-24 text-center text-base text-stone-600">Anulado</span>
+                    <span className="w-24 text-center text-base text-tinta-suave">Anulado</span>
                   ) : (
                     <Boton
                       variante="peligro"
@@ -200,7 +200,7 @@ export function DetallePersona({
                   )}
                 </div>
                 {confirmando === m.clave && (
-                  <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-red-50 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
                     <span className="mr-auto text-lg">¿Anular {esPago ? 'este pago' : 'esta compra'}?</span>
                     <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
                       No

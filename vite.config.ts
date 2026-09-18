@@ -62,8 +62,8 @@ export default defineConfig(({ mode }) => {
           lang: 'es-CO',
           start_url: '/',
           display: 'standalone',
-          background_color: '#fafaf9',
-          theme_color: '#92400e',
+          background_color: '#f2f4f7',
+          theme_color: '#f2f4f7',
           icons: [
             { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
             { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },

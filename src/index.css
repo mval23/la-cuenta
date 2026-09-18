@@ -3,7 +3,48 @@
 /* iPad en horizontal. Ver usePantallaAncha.ts. */
 @custom-variant ancha (@media (width >= 1100px));
 
+/*
+ * Paleta "Azul sereno". Todos los colores de la app salen de aquí: las clases
+ * se escriben con estos nombres (bg-marca, text-tinta-suave, border-control).
+ * Cada color tiene un solo significado:
+ *   marca    botones principales, selección y acciones en curso
+ *   exito    pagado, al día, a favor
+ *   aviso    advertencias que piden revisar ("¿Seguro?", "Falta")
+ *   peligro  anular y errores
+ *   info     datos útiles que no son un problema
+ */
 @theme {
+  --color-marca: #1d5fa8;
+  --color-marca-oscura: #154a87;
+  --color-marca-suave: #e8f0fa;
+  --color-marca-suave-oscura: #d6e4f5;
+
+  --color-fondo: #f2f4f7;
+  --color-superficie: #ffffff;
+  --color-hundido: #e9ecf1;
+
+  --color-tinta: #1b1f24;
+  --color-tinta-suave: #505866;
+  --color-tinta-tenue: #6b7280;
+  /* Separadores de listas: decorativos. */
+  --color-linea: #dde2e8;
+  /* Borde de campos y botones: 3:1 o más sobre cualquier fondo de la paleta. */
+  --color-control: #7a828f;
+
+  --color-exito: #166534;
+  --color-exito-suave: #e9f5ec;
+  --color-aviso: #6b4500;
+  --color-aviso-suave: #fff4d1;
+  --color-peligro: #b42318;
+  --color-peligro-oscuro: #912018;
+  --color-peligro-suave: #fdeceb;
+  --color-peligro-linea: #c9564b;
+  --color-info: #154a87;
+  --color-info-suave: #e8f0fa;
+
+  /* "Deshacer" sobre el aviso oscuro. */
+  --color-destello: #ffd166;
+
   --text-titulo: 1.625rem;
   --text-titulo--line-height: 1.2;
   --animate-aparecer: aparecer 200ms ease-out;
@@ -19,6 +60,8 @@
 :root {
   /* Alto de la barra de pestañas, sin contar la zona segura de abajo. */
   --alto-pestanas: 4.25rem;
+  /* Solo modo claro: así los controles nativos no se oscurecen con el iPad en modo oscuro. */
+  color-scheme: light;
 }
 
 /*
@@ -40,8 +83,8 @@ html {
 }
 
 body {
-  background: #fafaf9;
-  color: #1c1917;
+  background: var(--color-fondo);
+  color: var(--color-tinta);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 1.125rem;
   line-height: 1.4;
@@ -57,7 +100,7 @@ body {
   }
 
   :focus-visible {
-    outline: 3px solid var(--color-amber-700);
+    outline: 3px solid var(--color-marca);
     outline-offset: 2px;
   }
 }

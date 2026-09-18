@@ -82,7 +82,7 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
     return error ? (
       <ErrorDeCarga texto={error} onReintentar={cargar} />
     ) : (
-      <p className="text-lg text-stone-600">Cargando departamentos...</p>
+      <p className="text-lg text-tinta-suave">Cargando departamentos...</p>
     )
   }
 
@@ -91,19 +91,19 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-lg text-stone-600">
+      <p className="text-lg text-tinta-suave">
         Agrupan a las personas en Cobrar. En «Otras formas de decirlo» van los nombres con que se
         dicen, para que el dictado los reconozca.
       </p>
 
-      {error && <p className="text-lg text-red-800">{error}</p>}
+      {error && <p className="text-lg text-peligro">{error}</p>}
 
       {activos.length === 0 && (
-        <p className="text-lg text-stone-600">Todavía no hay departamentos. Agrega el primero.</p>
+        <p className="text-lg text-tinta-suave">Todavía no hay departamentos. Agrega el primero.</p>
       )}
 
       {activos.length > 0 && (
-        <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+        <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
           {activos.map((d) =>
             editando === d.id ? (
               <EditarDepartamento
@@ -119,7 +119,7 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
                 <div className="min-w-0 flex-1">
                   <p className="text-lg font-semibold">{d.nombre}</p>
                   {d.alias.length > 0 && (
-                    <p className="text-base text-stone-600">También: {d.alias.join(', ')}</p>
+                    <p className="text-base text-tinta-suave">También: {d.alias.join(', ')}</p>
                   )}
                 </div>
                 <Boton variante="secundario" compacto onClick={() => setEditando(d.id)}>
@@ -148,14 +148,14 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
       </form>
 
       {archivados.length > 0 && (
-        <details className="rounded-xl border border-stone-200 bg-white p-4">
-          <summary className="min-h-11 cursor-pointer content-center text-lg font-semibold text-stone-600">
+        <details className="rounded-xl border border-linea bg-superficie p-4">
+          <summary className="min-h-11 cursor-pointer content-center text-lg font-semibold text-tinta-suave">
             Archivados ({archivados.length})
           </summary>
           <ul className="mt-3 flex flex-col gap-3">
             {archivados.map((d) => (
               <li key={d.id} className="flex items-center gap-3">
-                <span className="flex-1 text-lg text-stone-600">{d.nombre}</span>
+                <span className="flex-1 text-lg text-tinta-suave">{d.nombre}</span>
                 <Boton variante="secundario" compacto onClick={() => reactivar(d)}>
                   Reactivar
                 </Boton>
@@ -187,14 +187,14 @@ function EditarDepartamento({
   }
 
   return (
-    <li className="bg-amber-50 p-4">
+    <li className="bg-marca-suave p-4">
       <form onSubmit={guardar} className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-stone-600">Nombre</span>
+          <span className="text-base font-semibold text-tinta-suave">Nombre</span>
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={campo} />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-stone-600">Otras formas de decirlo (separadas por coma)</span>
+          <span className="text-base font-semibold text-tinta-suave">Otras formas de decirlo (separadas por coma)</span>
           <input
             value={alias}
             onChange={(e) => setAlias(e.target.value)}

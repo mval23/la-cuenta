@@ -48,7 +48,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
     return (
       <section className="flex flex-col gap-4">
         <h1 className="text-titulo font-bold">Cobrar</h1>
-        <p className="text-lg text-stone-600">Esta parte solo la ven las administradoras.</p>
+        <p className="text-lg text-tinta-suave">Esta parte solo la ven las administradoras.</p>
       </section>
     )
   }
@@ -98,7 +98,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
     return errorDeCarga ? (
       <ErrorDeCarga texto="No se pudieron cargar los saldos." onReintentar={cargar} />
     ) : (
-      <p className="text-lg text-stone-600">Cargando...</p>
+      <p className="text-lg text-tinta-suave">Cargando...</p>
     )
   }
 
@@ -129,8 +129,8 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="text-titulo font-bold">Cobrar</h1>
-        <p className="text-lg text-stone-600">
-          Por cobrar <span className="font-semibold text-stone-900 tabular-nums">{formatearPesos(porCobrar)}</span>
+        <p className="text-lg text-tinta-suave">
+          Por cobrar <span className="font-semibold text-tinta tabular-nums">{formatearPesos(porCobrar)}</span>
         </p>
       </div>
 
@@ -149,7 +149,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
       )}
 
       {grupos.length === 0 && (
-        <p className="text-lg text-stone-600">
+        <p className="text-lg text-tinta-suave">
           {busqueda ? 'No hay nadie con ese nombre.' : 'Nadie debe. Todo está al día.'}
         </p>
       )}
@@ -159,7 +159,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
         const plegado = plegados.has(g.departamentoId) && !busqueda
         return (
           <div key={g.departamentoId}>
-            <h2 className="sticky top-0 z-10 -mx-2 bg-stone-50/95 px-2 backdrop-blur">
+            <h2 className="sticky top-0 z-10 -mx-2 bg-fondo/95 px-2 backdrop-blur">
               <button
                 type="button"
                 onClick={() => alternar(g.departamentoId)}
@@ -169,21 +169,21 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
                 <svg
                   viewBox="0 0 24 24"
                   aria-hidden="true"
-                  className={`h-5 w-5 shrink-0 fill-none stroke-stone-500 stroke-[2.5] transition-transform motion-reduce:transition-none ${
+                  className={`h-5 w-5 shrink-0 fill-none stroke-tinta-tenue stroke-[2.5] transition-transform motion-reduce:transition-none ${
                     plegado ? '-rotate-90' : ''
                   }`}
                 >
                   <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <span className="text-xl font-semibold">{g.departamento}</span>
-                <span className="flex-1 text-base text-stone-600">
+                <span className="flex-1 text-base text-tinta-suave">
                   · {g.personas.length} {g.personas.length === 1 ? 'persona' : 'personas'}
                 </span>
                 <span className="text-lg font-semibold tabular-nums">{formatearPesos(g.total)}</span>
               </button>
             </h2>
             {!plegado && (
-              <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+              <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
                 {g.personas.map((s) => (
                   <FilaDeCobro
                     key={s.persona_id}
@@ -216,10 +216,10 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
       {lista}
       <aside
         aria-label="Historial"
-        className="sticky top-6 max-h-[calc(100dvh-var(--alto-pestanas)-env(safe-area-inset-bottom)-3rem)] overflow-y-auto overscroll-contain rounded-2xl bg-stone-100 p-5"
+        className="sticky top-6 max-h-[calc(100dvh-var(--alto-pestanas)-env(safe-area-inset-bottom)-3rem)] overflow-y-auto overscroll-contain rounded-2xl bg-hundido p-5"
       >
         {detalle ?? (
-          <p className="py-8 text-center text-lg text-stone-600">
+          <p className="py-8 text-center text-lg text-tinta-suave">
             Toca un nombre para ver su historial.
           </p>
         )}
@@ -267,13 +267,13 @@ function FilaDeCobro({
           type="button"
           onClick={onAbrir}
           aria-current={seleccionada ? 'true' : undefined}
-          className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-r-lg pl-4 text-left active:bg-stone-100 ${
-            seleccionada ? 'bg-amber-50 font-semibold text-amber-900' : ''
+          className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-r-lg pl-4 text-left active:bg-hundido ${
+            seleccionada ? 'bg-marca-suave font-semibold text-marca-oscura' : ''
           }`}
         >
           <span className="min-w-0 flex-1 text-lg">{s.nombre}</span>
           <MontoDeSaldo valor={s.saldo} />
-          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-stone-400 stroke-2">
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-tinta-tenue stroke-2">
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
@@ -290,7 +290,7 @@ function FilaDeCobro({
       </div>
 
       {modo === 'total' && (
-        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-amber-50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-marca-suave px-4 py-3">
           <span className="mr-auto text-lg">
             ¿{s.nombre} pagó <span className="font-semibold tabular-nums">{formatearPesos(s.saldo)}</span>?
           </span>
@@ -304,7 +304,7 @@ function FilaDeCobro({
       )}
 
       {modo === 'abono' && (
-        <form onSubmit={guardarAbono} className="flex flex-col gap-2 bg-amber-50 px-4 py-3">
+        <form onSubmit={guardarAbono} className="flex flex-col gap-2 bg-marca-suave px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <input
               value={abono}
@@ -327,7 +327,7 @@ function FilaDeCobro({
             </Boton>
           </div>
           {valorAbono > s.saldo && (
-            <p className="text-base text-amber-900">
+            <p className="text-base text-info">
               Es más de lo que debe: quedará {formatearPesos(valorAbono - s.saldo)} a favor.
             </p>
           )}
@@ -338,10 +338,10 @@ function FilaDeCobro({
 }
 
 function MontoDeSaldo({ valor }: { valor: number }) {
-  if (valor === 0) return <span className="text-lg font-semibold text-green-800">Al día</span>
+  if (valor === 0) return <span className="text-lg font-semibold text-exito">Al día</span>
   if (valor < 0) {
     return (
-      <span className="text-lg font-semibold text-green-800 tabular-nums">A favor {formatearPesos(-valor)}</span>
+      <span className="text-lg font-semibold text-exito tabular-nums">A favor {formatearPesos(-valor)}</span>
     )
   }
   return <span className="text-lg font-semibold tabular-nums">{formatearPesos(valor)}</span>
