@@ -193,57 +193,60 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   }
 
   return (
-    <section className="flex flex-col gap-5">
-      <h1 className="text-titulo font-bold">Registrar</h1>
+    // En horizontal: a la izquierda se registra, a la derecha lo de hoy.
+    <section className="flex flex-col gap-5 ancha:grid ancha:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] ancha:items-start ancha:gap-x-10">
+      <div className="flex flex-col gap-5">
+        <h1 className="text-titulo font-bold">Registrar</h1>
 
-      {departamentos.length === 0 && (
-        <p className="rounded-xl bg-amber-50 p-4 text-lg text-amber-900">
-          Primero hay que crear los departamentos en Ajustes.
-        </p>
-      )}
+        {departamentos.length === 0 && (
+          <p className="rounded-xl bg-amber-50 p-4 text-lg text-amber-900">
+            Primero hay que crear los departamentos en Ajustes.
+          </p>
+        )}
 
-      {borrador ? (
-        <Confirmacion
-          borrador={borrador}
-          departamentos={departamentos}
-          personas={personas}
-          onCambiar={setBorrador}
-          onGuardar={guardar}
-          onCancelar={cancelar}
-        />
-      ) : (
-        <form onSubmit={alEnviar} className="flex flex-col gap-3">
-          {/* Solo en la pestaña visible, para que el micrófono no quede encendido. */}
-          {activa && (
-            <Microfono
-              vocabulario={() => vocabulario(personas, departamentos)}
-              onTexto={(dicho) => {
-                setTexto(dicho)
-                leer(dicho)
-              }}
-              onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
-              onEmpezar={cerrar}
-            />
-          )}
-          <label htmlFor="frase" className="pt-1 text-base text-stone-600">
-            O escríbelo. Por ejemplo: Juan TDH almuerzo a 10 mil
-          </label>
-          <div className="flex gap-3">
-            <input
-              id="frase"
-              ref={entrada}
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              autoComplete="off"
-              enterKeyHint="go"
-              className={`${campo} flex-1`}
-            />
-            <Boton type="submit" disabled={!texto.trim()}>
-              Seguir
-            </Boton>
-          </div>
-        </form>
-      )}
+        {borrador ? (
+          <Confirmacion
+            borrador={borrador}
+            departamentos={departamentos}
+            personas={personas}
+            onCambiar={setBorrador}
+            onGuardar={guardar}
+            onCancelar={cancelar}
+          />
+        ) : (
+          <form onSubmit={alEnviar} className="flex flex-col gap-3">
+            {/* Solo en la pestaña visible, para que el micrófono no quede encendido. */}
+            {activa && (
+              <Microfono
+                vocabulario={() => vocabulario(personas, departamentos)}
+                onTexto={(dicho) => {
+                  setTexto(dicho)
+                  leer(dicho)
+                }}
+                onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+                onEmpezar={cerrar}
+              />
+            )}
+            <label htmlFor="frase" className="pt-1 text-base text-stone-600">
+              O escríbelo. Por ejemplo: Juan TDH almuerzo a 10 mil
+            </label>
+            <div className="flex gap-3">
+              <input
+                id="frase"
+                ref={entrada}
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                autoComplete="off"
+                enterKeyHint="go"
+                className={`${campo} flex-1`}
+              />
+              <Boton type="submit" disabled={!texto.trim()}>
+                Seguir
+              </Boton>
+            </div>
+          </form>
+        )}
+      </div>
 
       <ComprasDeHoy compras={hoy} puedeAnular={puedeAnular} onAnular={anular} />
 
@@ -425,13 +428,15 @@ function ComprasDeHoy({
   onAnular: (c: CompraDeHoy) => Promise<void>
 }) {
   const [confirmando, setConfirmando] = useState<number | null>(null)
-  if (compras.length === 0) return null
+  if (compras.length === 0) {
+    return <p className="pt-3 text-lg text-stone-600 ancha:pt-1">Hoy todavía no se ha registrado nada.</p>
+  }
 
   const vigentes = compras.filter((c) => !c.anulada)
   const total = vigentes.reduce((suma, c) => suma + c.valor_pesos, 0)
 
   return (
-    <div className="flex flex-col gap-2 pt-3">
+    <div className="flex flex-col gap-2 pt-3 ancha:pt-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-xl font-semibold">
           Hoy <span className="text-base font-normal text-stone-600">

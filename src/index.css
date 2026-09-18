@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* iPad en horizontal. Ver usePantallaAncha.ts. */
+@custom-variant ancha (@media (width >= 1100px));
+
 @theme {
   --text-titulo: 1.625rem;
   --text-titulo--line-height: 1.2;

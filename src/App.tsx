@@ -90,7 +90,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
   // que se estaba escribiendo ni la búsqueda.
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-6 pb-[calc(var(--alto-pestanas)+env(safe-area-inset-bottom)+6rem)] sm:px-8">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-6 pb-[calc(var(--alto-pestanas)+env(safe-area-inset-bottom)+6rem)] sm:px-8 ancha:max-w-6xl ancha:px-10">
         <div hidden={pestana !== 'registrar'}>
           <Registrar perfil={perfil} activa={pestana === 'registrar'} />
         </div>

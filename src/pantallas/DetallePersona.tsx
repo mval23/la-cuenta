@@ -34,11 +34,14 @@ function fechaCorta(fecha: string): string {
 
 export function DetallePersona({
   saldo: s,
+  enPanel,
   onVolver,
   onCambio,
   mostrar,
 }: {
   saldo: Saldo
+  /** En horizontal va al lado de la lista en vez de reemplazarla. */
+  enPanel: boolean
   onVolver: () => void
   onCambio: () => Promise<void>
   mostrar: (aviso: DatosAviso) => void
@@ -92,9 +95,11 @@ export function DetallePersona({
     )
   }, [s.persona_id])
 
+  // También cuando cambia el saldo: en horizontal se puede pagar desde la lista
+  // con el historial abierto al lado.
   useEffect(() => {
     cargar()
-  }, [cargar])
+  }, [cargar, s.saldo])
 
   async function cambiarAnulado(m: Movimiento, anulado: boolean): Promise<boolean> {
     const cambio = m.tabla === 'compras' ? { anulada: anulado } : { anulado }
@@ -121,17 +126,30 @@ export function DetallePersona({
   }
 
   const aFavor = s.saldo < 0
+  const Titulo = enPanel ? 'h2' : 'h1'
 
   return (
     <section className="flex flex-col gap-5">
-      <Boton variante="texto" className="-ml-3 self-start" onClick={onVolver}>
-        <span aria-hidden="true">‹ </span>Volver a Cobrar
-      </Boton>
+      {!enPanel && (
+        <Boton variante="texto" className="-ml-3 self-start" onClick={onVolver}>
+          <span aria-hidden="true">‹ </span>Volver a Cobrar
+        </Boton>
+      )}
 
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div>
-          <h1 className="text-titulo font-bold">{s.nombre}</h1>
-          <p className="text-lg text-stone-600">{s.departamento}</p>
+      {/* En el panel, el saldo va debajo del nombre y "Cerrar" a la derecha. */}
+      <div
+        className={`flex justify-between gap-x-4 gap-y-2 ${enPanel ? 'flex-col' : 'flex-wrap items-end'}`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Titulo className="text-titulo font-bold">{s.nombre}</Titulo>
+            <p className="text-lg text-stone-600">{s.departamento}</p>
+          </div>
+          {enPanel && (
+            <Boton variante="texto" compacto className="-mr-3" onClick={onVolver}>
+              Cerrar
+            </Boton>
+          )}
         </div>
         <p className={`text-3xl font-bold tabular-nums ${aFavor || s.saldo === 0 ? 'text-green-800' : ''}`}>
           {aFavor
