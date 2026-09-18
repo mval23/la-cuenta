@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { Boton } from '../componentes/Boton'
 import { useAviso } from '../componentes/useAviso'
+import { olvidarPin } from '../lib/candado'
 import { supabase } from '../lib/supabase'
 import type { Perfil } from '../lib/tipos'
 import { Departamentos } from './Departamentos'
@@ -108,13 +109,19 @@ function Inicio({
       <div className="flex flex-col gap-3 border-t border-linea pt-6">
         <p className="text-lg text-tinta-suave">Usuaria: {perfil.nombre}</p>
         {saliendo ? (
-          // Para volver a entrar hace falta el PIN: mejor preguntar antes.
+          // Para volver a entrar hay que configurar el dispositivo otra vez: mejor preguntar antes.
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
-            <span className="mr-auto text-lg">¿Cerrar sesión? Para volver a entrar se necesita el PIN.</span>
+            <span className="mr-auto text-lg">¿Cerrar sesión? Para volver a entrar hay que configurar este dispositivo otra vez con la contraseña de la cuenta.</span>
             <Boton variante="secundario" compacto onClick={() => setSaliendo(false)}>
               No
             </Boton>
-            <Boton compacto onClick={() => supabase.auth.signOut()}>
+            <Boton
+              compacto
+              onClick={() => {
+                olvidarPin(localStorage)
+                void supabase.auth.signOut()
+              }}
+            >
               Sí, cerrar sesión
             </Boton>
           </div>
