@@ -71,3 +71,24 @@ npm test
 1. Abrir la dirección de Vercel en Safari, tocar el nombre y escribir el PIN.
 2. Tocar **Compartir > Agregar a pantalla de inicio**.
 3. Abrir siempre desde el ícono. La sesión queda guardada y no hay que volver a escribir el PIN.
+
+### 4. Respaldo diario
+
+`.github/workflows/respaldo.yml` corre todos los días a las 3:00 a. m. (hora de Colombia) y guarda un respaldo por 90 días en la pestaña **Actions** del repositorio. Si falla, GitHub envía un correo.
+
+1. En Supabase, botón **Connect** arriba, copiar la cadena de **Session pooler** (los servidores de GitHub no llegan a la conexión directa). Se ve así: `postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:5432/postgres`. Cambiar `[YOUR-PASSWORD]` por la contraseña de la base de datos.
+2. En GitHub, **Settings > Secrets and variables > Actions > New repository secret**: nombre `SUPABASE_DB_URL`, valor la cadena del paso anterior.
+3. En **Actions > Respaldo diario > Run workflow**, correrlo una vez para confirmar que funciona.
+
+Cada respaldo trae:
+
+- `la-cuenta.dump`: la base completa (esquema `public`).
+- `csv/`: cada tabla en CSV, más `saldos.csv` con lo que debe cada persona. Se abren en Excel.
+
+Para restaurar en un proyecto de Supabase nuevo y vacío:
+
+```bash
+pg_restore --no-owner --no-privileges --clean --if-exists -d "<cadena-de-conexión>" la-cuenta.dump
+```
+
+Después hay que volver a crear las usuarias y sus perfiles (pasos 4 y 5 de Supabase), porque las cuentas viven en el esquema `auth`, que no se respalda.
