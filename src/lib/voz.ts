@@ -5,7 +5,7 @@
 import { supabase } from './supabase'
 
 // Si la usuaria olvida tocar para terminar, la grabación se corta sola.
-const DURACION_MAXIMA_MS = 30_000
+export const DURACION_MAXIMA_MS = 30_000
 
 // Safari en iPad graba en mp4; Chrome en webm. Groq acepta los dos.
 const FORMATOS = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
