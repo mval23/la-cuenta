@@ -102,6 +102,18 @@ describe('operador', () => {
     })
   })
 
+  it('permite compras sin decir qué se compró, pero no con descripción vacía', async () => {
+    await como(OPERADOR, async () => {
+      await db.exec('begin')
+      const [c] = await filas(`insert into compras (persona_id, valor_pesos) values (${juanInsumos}, 1500) returning descripcion`)
+      await db.exec('rollback')
+      expect(c.descripcion).toBeNull()
+      await expect(
+        db.query(`insert into compras (persona_id, descripcion, valor_pesos) values (${juanTdh}, '  ', 1500)`),
+      ).rejects.toThrow()
+    })
+  })
+
   it('rechaza valores en cero y compras a nombre de otra usuaria', async () => {
     await como(OPERADOR, async () => {
       await expect(
