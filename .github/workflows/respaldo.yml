@@ -51,6 +51,10 @@ jobs:
           pg_dump --version
           pg_dump "$DB_URL" --schema=public --no-owner --no-privileges \
             --format=custom --file="$carpeta/la-cuenta.dump"
+          # Las compras y pagos apuntan a quién los registró (auth.users). Para
+          # restaurar en un proyecto nuevo hay que traer también las usuarias.
+          pg_dump "$DB_URL" --table=auth.users --data-only --no-owner --no-privileges \
+            --format=custom --file="$carpeta/usuarias.dump"
 
           for tabla in perfiles departamentos personas compras pagos; do
             psql "$DB_URL" -v ON_ERROR_STOP=1 \

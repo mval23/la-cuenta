@@ -83,12 +83,20 @@ npm test
 Cada respaldo trae:
 
 - `la-cuenta.dump`: la base completa (esquema `public`).
+- `usuarias.dump`: las cuentas de entrada (`auth.users`), con sus PIN cifrados.
 - `csv/`: cada tabla en CSV, más `saldos.csv` con lo que debe cada persona. Se abren en Excel.
 
-Para restaurar en un proyecto de Supabase nuevo y vacío:
+Para restaurar en el mismo proyecto (por ejemplo, si se dañaron datos):
 
 ```bash
 pg_restore --no-owner --no-privileges --clean --if-exists -d "<cadena-de-conexión>" la-cuenta.dump
 ```
 
-Después hay que volver a crear las usuarias y sus perfiles (pasos 4 y 5 de Supabase), porque las cuentas viven en el esquema `auth`, que no se respalda.
+Para restaurar en un proyecto nuevo, primero las usuarias y después el resto, porque las compras y los pagos guardan quién los registró. Así los PIN siguen funcionando:
+
+```bash
+pg_restore --data-only --no-owner -d "<cadena-de-conexión>" usuarias.dump
+pg_restore --no-owner --no-privileges -d "<cadena-de-conexión>" la-cuenta.dump
+```
+
+Esto no se ha ensayado todavía. Conviene probarlo una vez en un proyecto de Supabase aparte.
