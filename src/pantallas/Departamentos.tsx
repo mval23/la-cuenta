@@ -91,7 +91,10 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="text-xl font-semibold">Departamentos</h2>
+      <p className="text-lg text-stone-600">
+        Agrupan a las personas en Cobrar. En «Otras formas de decirlo» van los nombres con que se
+        dicen, para que el dictado los reconozca.
+      </p>
 
       {error && <p className="text-lg text-red-800">{error}</p>}
 

@@ -1,20 +1,109 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { Boton } from '../componentes/Boton'
 import { useAviso } from '../componentes/useAviso'
 import { supabase } from '../lib/supabase'
 import type { Perfil } from '../lib/tipos'
 import { Departamentos } from './Departamentos'
+import { Personas } from './Personas'
 
-export function Ajustes({ perfil }: { perfil: Perfil }) {
+type Seccion = 'inicio' | 'personas' | 'departamentos'
+
+const titulos: Record<Seccion, string> = {
+  inicio: 'Ajustes',
+  personas: 'Personas',
+  departamentos: 'Departamentos',
+}
+
+export function Ajustes({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
   const { aviso, mostrar, cerrar } = useAviso()
-  const [saliendo, setSaliendo] = useState(false)
+  const [seccion, setSeccion] = useState<Seccion>('inicio')
+
+  // Cada sección abre desde arriba.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [seccion])
+
+  function ir(nueva: Seccion) {
+    cerrar()
+    setSeccion(nueva)
+  }
 
   return (
-    <section className="flex max-w-3xl flex-col gap-8">
-      <h1 className="text-titulo font-bold">Ajustes</h1>
+    <section className="flex max-w-3xl flex-col gap-6">
+      {seccion !== 'inicio' && (
+        <Boton variante="texto" className="-mb-4 -ml-3 self-start" onClick={() => ir('inicio')}>
+          <span aria-hidden="true">‹ </span>Ajustes
+        </Boton>
+      )}
+      <h1 className="text-titulo font-bold">{titulos[seccion]}</h1>
 
-      <Departamentos mostrar={mostrar} />
+      {seccion === 'inicio' && <Inicio perfil={perfil} activa={activa} onIr={ir} />}
+      {seccion === 'personas' && <Personas mostrar={mostrar} />}
+      {seccion === 'departamentos' && <Departamentos mostrar={mostrar} />}
+
+      <Aviso aviso={aviso} onCerrar={cerrar} />
+    </section>
+  )
+}
+
+function Inicio({
+  perfil,
+  activa,
+  onIr,
+}: {
+  perfil: Perfil
+  activa: boolean
+  onIr: (seccion: Seccion) => void
+}) {
+  const [cuantas, setCuantas] = useState<{ personas: number; departamentos: number } | null>(null)
+  const [saliendo, setSaliendo] = useState(false)
+
+  // Se cuentan de nuevo al volver: al registrar se pueden crear personas.
+  useEffect(() => {
+    if (!activa) return
+    Promise.all([
+      supabase.from('personas').select('id', { count: 'exact', head: true }).eq('activo', true),
+      supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('activo', true),
+    ]).then(([p, d]) => {
+      if (p.count !== null && d.count !== null) setCuantas({ personas: p.count, departamentos: d.count })
+    })
+  }, [activa])
+
+  const filas: { seccion: Seccion; titulo: string; detalle: string }[] = [
+    {
+      seccion: 'personas',
+      titulo: 'Personas',
+      detalle: cuantas ? `${cuantas.personas} activas · agregar y cambiar` : 'Agregar y cambiar',
+    },
+    {
+      seccion: 'departamentos',
+      titulo: 'Departamentos',
+      detalle: cuantas ? `${cuantas.departamentos} activos · agregar y cambiar` : 'Agregar y cambiar',
+    },
+  ]
+
+  return (
+    <>
+      <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+        {filas.map((f) => (
+          <li key={f.seccion}>
+            <button
+              type="button"
+              onClick={() => onIr(f.seccion)}
+              className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left active:bg-stone-100"
+            >
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-lg font-semibold">{f.titulo}</span>
+                <span className="text-base text-stone-600">{f.detalle}</span>
+              </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-stone-400 stroke-2">
+                <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </li>
+        ))}
+      </ul>
 
       <div className="flex flex-col gap-3 border-t border-stone-200 pt-6">
         <p className="text-lg text-stone-600">Usuaria: {perfil.nombre}</p>
@@ -35,8 +124,6 @@ export function Ajustes({ perfil }: { perfil: Perfil }) {
           </Boton>
         )}
       </div>
-
-      <Aviso aviso={aviso} onCerrar={cerrar} />
-    </section>
+    </>
   )
 }
