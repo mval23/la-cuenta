@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
+import type { DatosAviso } from '../componentes/useAviso'
 import { supabase } from '../lib/supabase'
 import type { Departamento } from '../lib/tipos'
 
@@ -18,7 +19,7 @@ function aliasDesdeTexto(texto: string): string[] {
     .filter((a) => a !== '')
 }
 
-export function Departamentos() {
+export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) {
   const [lista, setLista] = useState<Departamento[] | null>(null)
   const [nuevo, setNuevo] = useState('')
   const [editando, setEditando] = useState<number | null>(null)
@@ -45,6 +46,7 @@ export function Departamentos() {
     const { error } = await supabase.from('departamentos').insert({ nombre })
     if (error) return setError(mensajeDeError(error))
     setNuevo('')
+    mostrar({ tipo: 'ok', texto: `Departamento agregado: ${nombre}` })
     cargar()
   }
 
@@ -57,6 +59,23 @@ export function Departamentos() {
     }
     await cargar()
     return true
+  }
+
+  async function archivar(d: Departamento) {
+    if (!(await actualizar(d.id, { activo: false }))) return
+    mostrar({
+      tipo: 'ok',
+      texto: `Se archivó ${d.nombre}. Ya no aparece al registrar.`,
+      deshacer: async () => {
+        await reactivar(d)
+      },
+    })
+  }
+
+  async function reactivar(d: Departamento) {
+    if (await actualizar(d.id, { activo: true })) {
+      mostrar({ tipo: 'ok', texto: `${d.nombre} volvió a estar activo.` })
+    }
   }
 
   if (lista === null) {
@@ -103,7 +122,7 @@ export function Departamentos() {
                 <Boton variante="secundario" compacto onClick={() => setEditando(d.id)}>
                   Cambiar
                 </Boton>
-                <Boton variante="peligro" compacto onClick={() => actualizar(d.id, { activo: false })}>
+                <Boton variante="peligro" compacto onClick={() => archivar(d)}>
                   Archivar
                 </Boton>
               </li>
@@ -134,7 +153,7 @@ export function Departamentos() {
             {archivados.map((d) => (
               <li key={d.id} className="flex items-center gap-3">
                 <span className="flex-1 text-lg text-stone-600">{d.nombre}</span>
-                <Boton variante="secundario" compacto onClick={() => actualizar(d.id, { activo: true })}>
+                <Boton variante="secundario" compacto onClick={() => reactivar(d)}>
                   Reactivar
                 </Boton>
               </li>

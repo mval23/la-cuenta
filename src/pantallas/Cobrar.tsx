@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
+import { usePantallaAncha } from '../componentes/usePantallaAncha'
 import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
@@ -20,6 +21,8 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   const [plegados, setPlegados] = useState<ReadonlySet<number>>(new Set())
   const { aviso, mostrar, cerrar } = useAviso()
   const posicionDeLista = useRef(0)
+  // En horizontal, la lista y el historial van lado a lado.
+  const ancha = usePantallaAncha()
 
   const cargar = useCallback(async () => {
     const { data, error } = await supabase
@@ -36,10 +39,10 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
     cargar()
   }, [activa, cargar])
 
-  // El historial abre desde arriba; al volver, la lista queda donde estaba.
+  // En vertical el historial abre desde arriba; al volver, la lista queda donde estaba.
   useLayoutEffect(() => {
-    window.scrollTo(0, abierta === null ? posicionDeLista.current : 0)
-  }, [abierta])
+    if (!ancha) window.scrollTo(0, abierta === null ? posicionDeLista.current : 0)
+  }, [abierta, ancha])
 
   if (perfil.rol === 'cocina') {
     return (
@@ -81,7 +84,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
       deshacer: async () => {
         const { error } = await supabase.from('pagos').update({ anulado: true }).eq('id', data.id)
         if (error) mostrar({ tipo: 'error', texto: 'No se pudo deshacer. Revisa el internet.' })
-        else mostrar({ tipo: 'ok', texto: `Se deshizo el pago de ${s.nombre}.` })
+        else mostrar({ tipo: 'ok', texto: `Se deshizo el ${tipo === 'total' ? 'pago' : 'abono'} de ${s.nombre}.` })
         await cargar()
       },
     })
@@ -100,15 +103,20 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   }
 
   const persona = saldos.find((s) => s.persona_id === abierta)
-  if (persona) {
+  const detalle = persona && (
+    <DetallePersona
+      key={persona.persona_id}
+      saldo={persona}
+      enPanel={ancha}
+      onVolver={() => setAbierta(null)}
+      onCambio={cargar}
+      mostrar={mostrar}
+    />
+  )
+  if (detalle && !ancha) {
     return (
       <>
-        <DetallePersona
-          saldo={persona}
-          onVolver={() => setAbierta(null)}
-          onCambio={cargar}
-          mostrar={mostrar}
-        />
+        {detalle}
         {avisoFlotante}
       </>
     )
@@ -117,7 +125,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   const porCobrar = saldos.reduce((suma, s) => suma + Math.max(s.saldo, 0), 0)
   const grupos = agruparParaCobro(saldos, busqueda, pagadas)
 
-  return (
+  const lista = (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="text-titulo font-bold">Cobrar</h1>
@@ -180,6 +188,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
                   <FilaDeCobro
                     key={s.persona_id}
                     saldo={s}
+                    seleccionada={ancha && s.persona_id === abierta}
                     onAbrir={() => abrir(s.persona_id)}
                     onPago={(valor, tipo) => registrarPago(s, valor, tipo)}
                   />
@@ -189,18 +198,45 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
           </div>
         )
       })}
-
-      {avisoFlotante}
     </section>
+  )
+
+  if (!ancha) {
+    return (
+      <>
+        {lista}
+        {avisoFlotante}
+      </>
+    )
+  }
+
+  // El panel del historial se queda quieto mientras la lista se desplaza.
+  return (
+    <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-8">
+      {lista}
+      <aside
+        aria-label="Historial"
+        className="sticky top-6 max-h-[calc(100dvh-var(--alto-pestanas)-env(safe-area-inset-bottom)-3rem)] overflow-y-auto overscroll-contain rounded-2xl bg-stone-100 p-5"
+      >
+        {detalle ?? (
+          <p className="py-8 text-center text-lg text-stone-600">
+            Toca un nombre para ver su historial.
+          </p>
+        )}
+      </aside>
+      {avisoFlotante}
+    </div>
   )
 }
 
 function FilaDeCobro({
   saldo: s,
+  seleccionada,
   onAbrir,
   onPago,
 }: {
   saldo: Saldo
+  seleccionada: boolean
   onAbrir: () => void
   onPago: (valor: number, tipo: 'total' | 'abono') => Promise<boolean>
 }) {
@@ -230,7 +266,10 @@ function FilaDeCobro({
         <button
           type="button"
           onClick={onAbrir}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-r-lg pl-4 text-left active:bg-stone-100"
+          aria-current={seleccionada ? 'true' : undefined}
+          className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-r-lg pl-4 text-left active:bg-stone-100 ${
+            seleccionada ? 'bg-amber-50 font-semibold text-amber-900' : ''
+          }`}
         >
           <span className="min-w-0 flex-1 text-lg">{s.nombre}</span>
           <MontoDeSaldo valor={s.saldo} />
