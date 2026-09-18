@@ -1,10 +1,12 @@
 # Ensayo de restauración del respaldo diario.
 #
 # Un respaldo solo sirve si se puede restaurar. Una vez al mes toma el último
-# respaldo guardado por "Respaldo diario", lo restaura en un Supabase nuevo y
-# vacío siguiendo los pasos del README y revisa que quede completo: las mismas
-# filas, los mismos saldos, el mismo esquema que las migraciones y que la app
-# pueda seguir anotando. Si algo falla, GitHub avisa por correo.
+# respaldo guardado por "Respaldo diario" y lo restaura con scripts/restaurar.sh
+# en un Supabase nuevo, como se haría en una emergencia. Revisa que cada tabla
+# quede fila por fila igual al respaldo, que los saldos coincidan y que la app
+# pueda seguir anotando. Después lo restaura otra vez encima (--reemplazar),
+# como si se dañaran los datos en el mismo proyecto. Si algo falla, GitHub
+# avisa por correo.
 #
 # Todo pasa dentro de la máquina de GitHub y se borra al terminar. Los
 # registros solo muestran conteos, nunca nombres ni valores.
@@ -19,6 +21,7 @@ on:
   push:
     paths:
       - .github/workflows/ensayo-restauracion.yml
+      - scripts/restaurar.sh
       - scripts/verificar-restauracion.sh
       - supabase/migrations/**
 
@@ -29,8 +32,6 @@ permissions:
 
 env:
   DB: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-  # Solo la base y la autenticación: lo demás de Supabase no hace falta aquí.
-  SIN: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
 jobs:
   ensayo:
@@ -66,32 +67,18 @@ jobs:
           sudo apt-get install -y -qq postgresql-client-17 > /dev/null
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
-      - name: Esquema de referencia (las migraciones en una base limpia)
-        run: |
-          supabase start -x "$SIN"
-          pg_dump "$DB" --schema=public --schema-only --no-owner > "$RUNNER_TEMP/referencia.sql"
-          supabase stop --no-backup
+      - name: Supabase nuevo con el esquema de las migraciones (como db push)
+        # Solo la base y la autenticación: lo demás de Supabase no hace falta aquí.
+        run: supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
-      - name: Supabase nuevo y vacío, como un proyecto recién creado
-        working-directory: ${{ runner.temp }}
-        run: |
-          mkdir nuevo && cd nuevo
-          supabase init
-          sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
-          supabase start -x "$SIN"
-
-      - name: Restaurar con los pasos del README (proyecto nuevo)
-        run: |
-          set +e
-          pg_restore --data-only --no-owner -d "$DB" "$RESPALDO/usuarias.dump"
-          usuarias=$?
-          pg_restore --no-owner --no-privileges -d "$DB" "$RESPALDO/la-cuenta.dump"
-          base=$?
-          echo "pg_restore usuarias: $usuarias. pg_restore base: $base."
-          # Se sigue aunque falle: la verificación dice qué quedó mal.
-          if [ $usuarias -ne 0 ] || [ $base -ne 0 ]; then
-            echo "::warning::pg_restore terminó con errores (ver arriba)."
-          fi
+      - name: Restaurar en el proyecto nuevo
+        run: bash scripts/restaurar.sh "$DB" "$RESPALDO"
 
       - name: Verificar
-        run: bash scripts/verificar-restauracion.sh "$DB" "$RESPALDO" "$RUNNER_TEMP/referencia.sql"
+        run: bash scripts/verificar-restauracion.sh "$DB" "$RESPALDO"
+
+      - name: Restaurar otra vez encima, como en el mismo proyecto
+        run: bash scripts/restaurar.sh "$DB" "$RESPALDO" --reemplazar
+
+      - name: Verificar otra vez
+        run: bash scripts/verificar-restauracion.sh "$DB" "$RESPALDO"

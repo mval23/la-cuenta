@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# Revisa que una base restaurada desde el respaldo diario esté completa y que
-# la app pueda seguir trabajando con ella.
+# Revisa que una base restaurada desde el respaldo diario tenga exactamente los
+# mismos datos y que la app pueda seguir trabajando con ella.
 #
-# Uso: verificar-restauracion.sh <cadena-de-conexión> <carpeta-del-respaldo> <referencia.sql>
+# Uso: verificar-restauracion.sh <cadena-de-conexión> <carpeta-del-respaldo>
 #
-# <referencia.sql> es el esquema public que dejan las migraciones en una base
-# limpia (pg_dump --schema-only). La base restaurada debe quedar idéntica.
-#
-# Solo imprime conteos y diferencias de esquema, nunca nombres ni valores:
-# los registros de GitHub Actions no deben llevar datos de la cocina.
+# Solo imprime conteos, nunca nombres ni valores: los registros de GitHub
+# Actions no deben llevar datos de la cocina.
 
 set -uo pipefail
 
 db=$1
 carpeta=$2
-referencia=$3
 fallas=0
 
 falla() {
@@ -26,20 +22,28 @@ consulta() {
   psql "$db" -v ON_ERROR_STOP=1 -tAq -c "$1"
 }
 
-# Una fila de CSV puede tener saltos de línea (texto dictado), así que no se
-# cuentan con wc -l.
-filas_csv() {
-  python3 -c 'import csv, sys; print(sum(1 for _ in csv.reader(open(sys.argv[1], newline=""))) - 1)' "$1"
+# Compara dos CSV fila por fila, sin importar el orden, y dice cuántas filas
+# hay y cuántas difieren. Una fila puede tener saltos de línea (el texto
+# dictado), por eso no se compara con diff.
+comparar_csv() {
+  python3 - "$1" "$2" <<'PY'
+import csv, sys
+from collections import Counter
+a, b = (Counter(tuple(f) for f in csv.reader(open(p, newline=""))) for p in sys.argv[1:])
+print(f"{sum(a.values()) - 1} en el respaldo, {sum(b.values()) - 1} restauradas, "
+      f"{sum((a - b).values()) + sum((b - a).values())} distintas")
+sys.exit(0 if a == b else 1)
+PY
 }
 
-echo "== Filas por tabla"
+echo "== Cada tabla, fila por fila"
 for tabla in perfiles departamentos personas compras pagos; do
-  esperadas=$(filas_csv "$carpeta/csv/$tabla.csv")
-  restauradas=$(consulta "select count(*) from public.$tabla" 2>&1)
-  if [ "$esperadas" = "$restauradas" ]; then
-    echo "$tabla: $restauradas, igual que el respaldo"
+  psql "$db" -v ON_ERROR_STOP=1 -q \
+    -c "copy (select * from public.$tabla order by 1) to stdout with csv header" > "restaurada-$tabla.csv"
+  if resumen=$(comparar_csv "$carpeta/csv/$tabla.csv" "restaurada-$tabla.csv"); then
+    echo "$tabla: $resumen"
   else
-    falla "$tabla: el respaldo tiene $esperadas filas y la base restaurada $restauradas"
+    falla "$tabla: $resumen"
   fi
 done
 
@@ -50,16 +54,12 @@ sin_clave=$(consulta "select count(*) from auth.users u join public.perfiles p o
 [ "$sin_clave" = 0 ] || falla "$sin_clave usuarias quedaron sin contraseña"
 echo "Perfiles sin cuenta: $sin_cuenta. Usuarias sin contraseña: $sin_clave."
 
-echo "== Esquema igual al de las migraciones"
-# \restrict trae una clave al azar en cada pg_dump; los comentarios, la versión.
-limpiar() { grep -vE '^(\\(un)?restrict |--|$)'; }
-pg_dump "$db" --schema=public --schema-only --no-owner | limpiar > restaurado.sql
-if diff -u <(limpiar < "$referencia") restaurado.sql > esquema.diff; then
-  echo "Idéntico: tablas, reglas de acceso (RLS), permisos, funciones y triggers."
-else
-  cat esquema.diff
-  falla "El esquema restaurado no es igual al de las migraciones (diferencias arriba)"
-fi
+echo "== Triggers encendidos"
+apagados=$(consulta "select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
+                     join pg_namespace n on n.oid = c.relnamespace
+                     where n.nspname = 'public' and not t.tgisinternal and t.tgenabled = 'D'")
+[ "$apagados" = 0 ] || falla "$apagados triggers quedaron apagados"
+echo "Apagados: $apagados."
 
 # Lo que sigue se hace como la app: con el rol authenticated y la sesión de una
 # administradora, dentro de una transacción que se deshace al final.
@@ -78,24 +78,16 @@ SQL
   }
 
   echo "== Saldos vistos desde la app"
-  # Mismas columnas y orden que csv/saldos.csv del respaldo.
-  como_admin "copy (select departamento, nombre, activo, comprado, pagado, saldo
-                    from public.saldos order by departamento, nombre)
+  # Mismas columnas que csv/saldos.csv del respaldo.
+  como_admin "copy (select departamento, nombre, activo, comprado, pagado, saldo from public.saldos)
               to stdout with csv header;" > saldos-restaurados.csv
-  if python3 - "$carpeta/csv/saldos.csv" saldos-restaurados.csv <<'PY'
-import csv, sys
-from collections import Counter
-a, b = (Counter(tuple(f) for f in csv.reader(open(p, newline=""))) for p in sys.argv[1:])
-print(f"Saldos en el respaldo: {sum(a.values()) - 1}. Vistos por la app: {sum(b.values()) - 1}. Distintos: {sum((a - b).values()) + sum((b - a).values())}.")
-sys.exit(0 if a == b else 1)
-PY
-  then
-    echo "Cada persona debe lo mismo que en el respaldo."
+  if resumen=$(comparar_csv "$carpeta/csv/saldos.csv" saldos-restaurados.csv); then
+    echo "Saldos: $resumen"
   else
-    falla "Los saldos restaurados no son iguales a los del respaldo"
+    falla "Saldos: $resumen"
   fi
 
-  echo "== La app puede seguir anotando"
+  echo "== La app puede seguir anotando y no puede cambiar valores"
   # Si los contadores de id no se restauraron, estas filas chocan con las viejas.
   if como_admin "
       insert into public.departamentos (nombre) values ('Ensayo de restauración');
@@ -105,11 +97,21 @@ PY
         select max(id), 1000 from public.personas;
       insert into public.pagos (persona_id, valor_pesos, tipo)
         select max(id), 1000, 'total' from public.personas;
-      update public.compras set anulada = true where id = (select max(id) from public.compras);" > /dev/null
+      update public.compras set anulada = true where id = (select max(id) from public.compras);
+      do \$\$ begin
+        update public.compras set valor_pesos = 1;
+        raise exception 'se pudo cambiar el valor de una compra';
+      exception when insufficient_privilege then null;
+      end \$\$;
+      do \$\$ begin
+        delete from public.pagos;
+        raise exception 'se pudo borrar un pago';
+      exception when insufficient_privilege then null;
+      end \$\$;" > /dev/null
   then
-    echo "Crear departamento, persona, compra y pago, y anular: funciona."
+    echo "Crear departamento, persona, compra y pago, y anular: funciona. Cambiar valores y borrar: no se puede."
   else
-    falla "La app no podría registrar en la base restaurada"
+    falla "La app no funcionaría bien con la base restaurada (error arriba)"
   fi
 fi
 
