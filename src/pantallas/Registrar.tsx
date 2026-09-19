@@ -362,8 +362,8 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
   if (esHoy && !abierto) {
     return (
       <div className="-my-2 flex flex-wrap items-center gap-x-3">
-        <p className="text-lg text-tinta-suave">
-          Compras de <strong className="font-semibold text-tinta">hoy</strong>, {fechaLarga(hoy)}
+        <p className="text-xl text-tinta-suave">
+          Compras de <strong className="font-semibold text-tinta">hoy, {fechaLarga(hoy)}</strong>
         </p>
         <Boton variante="texto" compacto className="-ml-2" onClick={() => setAbierto(true)}>
           ¿Son de otro día?
@@ -381,7 +381,7 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
         <p className="text-lg font-semibold">¿De qué día son las compras que vas a anotar?</p>
       ) : (
         <div>
-          <p className="text-xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
+          <p className="text-2xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
           <p className="text-base text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
         </div>
       )}

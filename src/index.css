@@ -66,20 +66,12 @@
 
 /*
  * 17px, el texto normal de iPadOS. Todo lo demás se mide en rem a partir de
- * aquí. En el iPad se usa el tamaño de texto elegido en Ajustes del iPad
- * (Pantalla y brillo > Tamaño del texto), que por defecto también es 17px.
+ * aquí. No sigue el tamaño de texto de Ajustes del iPad: el de Amparo lo tiene
+ * agrandado, y la app ya viene con letra grande; sumados, no cabía nada.
  */
 html {
   font-size: 106.25%;
   -webkit-text-size-adjust: 100%;
-}
-
-@supports (font: -apple-system-body) {
-  @media (pointer: coarse) {
-    html {
-      font: -apple-system-body;
-    }
-  }
 }
 
 body {
