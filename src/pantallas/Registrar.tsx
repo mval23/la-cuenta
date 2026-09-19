@@ -525,7 +525,7 @@ function Confirmacion({
           <div className="flex items-center gap-3">
             <p className="min-w-0 flex-1 text-2xl font-bold">
               {elegida.nombre}{' '}
-              <span className="text-xl font-normal text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
+              <span className="font-semibold text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
             </p>
             <Boton
               variante="secundario"
@@ -583,10 +583,10 @@ function Confirmacion({
                   key={p.id}
                   type="button"
                   onClick={() => cambiar({ personaId: p.id })}
-                  className="min-h-12 rounded-xl border border-control px-4 text-left text-lg active:bg-hundido"
+                  className="min-h-14 rounded-xl border border-control px-4 text-left text-xl active:bg-hundido"
                 >
                   <span className="font-semibold">{p.nombre}</span>{' '}
-                  <span className="text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
+                  <span className="font-semibold text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
                 </button>
               ))}
             </div>
@@ -683,7 +683,7 @@ function Confirmacion({
             Cancelar
           </Boton>
           <Boton type="submit" className="min-w-44" disabled={!listo || guardando}>
-            {guardando ? 'Guardando...' : valor > 0 ? `Guardar ${formatearPesos(valor)}` : 'Guardar'}
+            {guardando ? 'Guardando...' : 'OK'}
           </Boton>
         </div>
       )}
