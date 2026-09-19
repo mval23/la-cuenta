@@ -103,3 +103,44 @@ export function nombreDelMes(mes: string): string {
   const texto = formatoMes.format(mediodia(`${mes}-01`))
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
+
+// Quincenas --------------------------------------------------------------------
+// Se cobra el 15 y el último día del mes: del 1 al 15 y del 16 al fin de mes.
+
+export interface Quincena {
+  desde: string
+  hasta: string
+}
+
+/** La quincena a la que pertenece un día. */
+export function quincenaDe(dia: string): Quincena {
+  const mes = mesDe(dia)
+  if (Number(dia.slice(8, 10)) <= 15) return { desde: `${mes}-01`, hasta: `${mes}-15` }
+  return { desde: `${mes}-16`, hasta: sumarDias(`${sumarMeses(mes, 1)}-01`, -1) }
+}
+
+/** La quincena anterior (-1) o la siguiente (1). */
+export function quincenaVecina(q: Quincena, paso: -1 | 1): Quincena {
+  return quincenaDe(paso === 1 ? sumarDias(q.hasta, 1) : sumarDias(q.desde, -1))
+}
+
+const formatoMesSolo = new Intl.DateTimeFormat('es-CO', { timeZone: 'UTC', month: 'long' })
+
+/** "1 al 15 de septiembre de 2026" */
+export function nombreDeQuincena(q: Quincena): string {
+  const dia = (d: string) => Number(d.slice(8, 10))
+  return `${dia(q.desde)} al ${dia(q.hasta)} de ${formatoMesSolo.format(mediodia(q.desde))} de ${q.desde.slice(0, 4)}`
+}
+
+/** "14 de Septiembre de 2026", como en el encabezado de una cuenta de cobro. */
+export function fechaDeDocumento(dia: string): string {
+  const mes = formatoMesSolo.format(mediodia(dia))
+  return `${Number(dia.slice(8, 10))} de ${mes.charAt(0).toUpperCase()}${mes.slice(1)} de ${dia.slice(0, 4)}`
+}
+
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sept', 'Oct', 'Nov', 'Dic']
+
+/** "Ago-02", como en la tabla de una cuenta de cobro. */
+export function fechaDeTabla(dia: string): string {
+  return `${MESES_CORTOS[Number(dia.slice(5, 7)) - 1]}-${dia.slice(8, 10)}`
+}

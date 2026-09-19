@@ -241,3 +241,53 @@ describe('admin', () => {
     })
   })
 })
+
+describe('documentos', () => {
+  let ana: number
+
+  it('la cuenta de la quincena separa lo anterior, lo del periodo y lo que queda', async () => {
+    await como(OPERADOR, async () => {
+      const [d] = await filas(`insert into departamentos (nombre) values ('Gerencia') returning id`)
+      const [p] = await filas(`insert into personas (nombre, departamento_id) values ('Ana', ${d.id}) returning id`)
+      ana = p.id as number
+      await db.query(`insert into compras (persona_id, valor_pesos, fecha) values
+        (${ana}, 8000, public.hoy_bogota() - 20),
+        (${ana}, 3000, public.hoy_bogota() - 5)`)
+      await db.query(`insert into compras (persona_id, valor_pesos, fecha, anulada) values
+        (${ana}, 999, public.hoy_bogota() - 4, true)`)
+      await db.query(`insert into pagos (persona_id, valor_pesos, tipo, fecha) values
+        (${ana}, 2000, 'abono', public.hoy_bogota() - 20),
+        (${ana}, 1000, 'abono', public.hoy_bogota() - 2),
+        (${ana}, 500, 'abono', public.hoy_bogota())`)
+      const [c] = await filas(`select * from cuenta_de_quincena(public.hoy_bogota() - 10, public.hoy_bogota() - 1)
+                               where persona_id = ${ana}`)
+      expect(c.departamento).toBe('Gerencia')
+      expect([c.anterior, c.comprado, c.pagado, c.saldo].map(Number)).toEqual([6000, 3000, 1000, 8000])
+    })
+  })
+
+  it('la cocina y quien no tiene perfil no ven la cuenta de la quincena', async () => {
+    for (const uid of [COCINA, SIN_PERFIL]) {
+      await como(uid, async () => {
+        expect(await filas(`select * from cuenta_de_quincena('2000-01-01', public.hoy_bogota())`)).toHaveLength(0)
+      })
+    }
+  })
+
+  it('los datos de cobro son una sola fila que se cambia, no se crea ni se borra', async () => {
+    await como(OPERADOR, async () => {
+      await db.query(`update datos_de_cobro set nombre = 'Amparo', cliente_nombre = 'ORF S.A. BIC'`)
+      const datos = await filas('select nombre, cliente_nombre, concepto from datos_de_cobro')
+      expect(datos).toEqual([{ nombre: 'Amparo', cliente_nombre: 'ORF S.A. BIC', concepto: 'Servicio de comedor y otros' }])
+      await expect(db.query('insert into datos_de_cobro (id) values (false)')).rejects.toThrow()
+      await expect(db.query('delete from datos_de_cobro')).rejects.toThrow()
+    })
+  })
+
+  it('la cocina no ve ni cambia los datos de cobro', async () => {
+    await como(COCINA, async () => {
+      expect(await filas('select * from datos_de_cobro')).toHaveLength(0)
+      expect((await db.query(`update datos_de_cobro set nombre = 'X'`)).affectedRows).toBe(0)
+    })
+  })
+})
