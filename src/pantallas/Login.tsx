@@ -1,125 +1,86 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
+import { Boton } from '../componentes/Boton'
+import { campo } from '../componentes/estilos'
+import { LARGO_PIN, olvidarPin, quedoBloqueado } from '../lib/candado'
 import { supabase } from '../lib/supabase'
-import { claveDesdePin, LARGO_PIN, leerUsuarias, type Usuaria } from '../lib/usuarias'
 
-const usuarias = leerUsuarias(import.meta.env.VITE_USUARIAS)
-
+/**
+ * Configurar el dispositivo: se entra una sola vez con el correo y la
+ * contraseña larga de la cuenta. Después la sesión queda guardada y la app se
+ * abre con el PIN (ver lib/candado.ts).
+ */
 export function Login() {
-  const [elegida, setElegida] = useState<Usuaria | null>(null)
-
-  return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-6">
-      <img src="/logo.svg" alt="" className="mx-auto mb-3 h-16 w-16" />
-      <h1 className="mb-6 text-center text-3xl font-bold">La Cuenta</h1>
-      {elegida ? (
-        <Pin usuaria={elegida} volver={() => setElegida(null)} />
-      ) : (
-        <Elegir elegir={setElegida} />
-      )}
-    </div>
-  )
-}
-
-function Elegir({ elegir }: { elegir: (u: Usuaria) => void }) {
-  if (usuarias.length === 0) {
-    return (
-      <p className="text-center text-lg text-peligro">
-        Falta configurar VITE_USUARIAS. Revisa .env.example.
-      </p>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-center text-xl font-semibold">¿Quién va a entrar?</p>
-      {usuarias.map((u) => (
-        <button
-          key={u.correo}
-          type="button"
-          onClick={() => elegir(u)}
-          className="min-h-14 rounded-xl bg-marca text-xl font-semibold text-white active:bg-marca-oscura"
-        >
-          {u.nombre}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function Pin({ usuaria, volver }: { usuaria: Usuaria; volver: () => void }) {
-  const [pin, setPin] = useState('')
+  const [correo, setCorreo] = useState('')
+  const [clave, setClave] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [entrando, setEntrando] = useState(false)
+  const [bloqueado] = useState(() => quedoBloqueado(localStorage))
 
-  async function entrar(completo: string) {
+  async function entrar(e: FormEvent) {
+    e.preventDefault()
+    if (entrando) return
     setEntrando(true)
-    const { error } = await supabase.auth.signInWithPassword({
-      email: usuaria.correo,
-      password: claveDesdePin(completo),
-    })
+    setError(null)
+    // Antes de entrar: si no, el candado de una sesión anterior (por ejemplo,
+    // bloqueado por muchos fallos) aparecería apenas se abra la sesión.
+    olvidarPin(localStorage)
+    const { error } = await supabase.auth.signInWithPassword({ email: correo.trim(), password: clave })
     // Si entra, App cambia de pantalla sola.
     if (error) {
       setError(
         error.code === 'invalid_credentials'
-          ? 'Ese PIN no es. Intenta otra vez.'
+          ? 'El correo o la contraseña no son. Revísalos e intenta otra vez.'
           : 'No se pudo entrar. Revisa el internet e intenta otra vez.',
       )
-      setPin('')
       setEntrando(false)
     }
   }
 
-  function tocar(digito: string) {
-    if (entrando || pin.length >= LARGO_PIN) return
-    setError(null)
-    const nuevo = pin + digito
-    setPin(nuevo)
-    if (nuevo.length === LARGO_PIN) void entrar(nuevo)
-  }
-
-  function borrar() {
-    if (!entrando) setPin(pin.slice(0, -1))
-  }
-
-  const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
-  const estiloTecla =
-    'min-h-16 rounded-xl border border-control bg-superficie text-2xl font-semibold tabular-nums active:bg-hundido disabled:text-tinta-tenue'
-
   return (
-    <div className="flex flex-col gap-5">
-      <p className="text-center text-xl font-semibold">Hola, {usuaria.nombre}. Escribe tu PIN</p>
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-6">
+      <img src="/logo.svg" alt="" className="mx-auto mb-3 h-16 w-16" />
+      <h1 className="text-center text-3xl font-bold">La Cuenta</h1>
+      <p className="mb-6 text-center text-xl text-tinta-suave">Configurar este dispositivo</p>
 
-      <div className="flex justify-center gap-4" aria-label={`${pin.length} de ${LARGO_PIN} dígitos`}>
-        {Array.from({ length: LARGO_PIN }, (_, i) => (
-          <span
-            key={i}
-            className={`h-6 w-6 rounded-full border-2 border-marca ${
-              i < pin.length ? 'bg-marca' : ''
-            }`}
+      <form onSubmit={entrar} className="flex flex-col gap-4">
+        {bloqueado && (
+          <p className="rounded-xl bg-aviso-suave p-4 text-lg" role="status">
+            Se cerró la sesión porque el PIN se escribió mal muchas veces.
+          </p>
+        )}
+        <p className="text-lg">
+          Esto se hace una sola vez. Después, La Cuenta se abre con un PIN de {LARGO_PIN} números.
+        </p>
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Correo de la cuenta</span>
+          <input
+            type="email"
+            value={correo}
+            onChange={(e) => setCorreo(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            required
+            className={campo}
           />
-        ))}
-      </div>
-
-      <p className="min-h-7 text-center text-lg text-peligro" role="alert">
-        {entrando ? <span className="text-tinta-suave">Entrando...</span> : error}
-      </p>
-
-      <div className="grid grid-cols-3 gap-3">
-        {teclas.map((t) => (
-          <button key={t} type="button" onClick={() => tocar(t)} disabled={entrando} className={estiloTecla}>
-            {t}
-          </button>
-        ))}
-        <button type="button" onClick={volver} disabled={entrando} className={`${estiloTecla} text-lg`}>
-          Volver
-        </button>
-        <button type="button" onClick={() => tocar('0')} disabled={entrando} className={estiloTecla}>
-          0
-        </button>
-        <button type="button" onClick={borrar} disabled={entrando} className={`${estiloTecla} text-lg`}>
-          Borrar
-        </button>
-      </div>
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Contraseña</span>
+          <input
+            type="password"
+            value={clave}
+            onChange={(e) => setClave(e.target.value)}
+            autoComplete="current-password"
+            required
+            className={campo}
+          />
+        </label>
+        <p className="min-h-7 text-lg text-peligro" role="alert">
+          {error}
+        </p>
+        <Boton type="submit" disabled={entrando || !correo.trim() || !clave}>
+          {entrando ? 'Entrando...' : 'Entrar'}
+        </Boton>
+      </form>
     </div>
   )
 }

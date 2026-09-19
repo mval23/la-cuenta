@@ -40,7 +40,7 @@ Dura unos 20 minutos. Repetirla una semana después para ver si recuerda el fluj
 
 ## Qué mirar en el iPad, además de Amparo
 
-- Con Ajustes del iPad > Pantalla y brillo > Tamaño del texto al máximo, nada se corta ni se monta.
+- La letra de la app no cambia con Ajustes del iPad > Pantalla y brillo > Tamaño del texto: debe leerse bien igual.
 - Con el teclado abierto en horizontal, el botón Guardar se ve al escribir el valor.
 - La barra de pestañas no choca con la barra de inicio del iPad.
 - Con Ajustes > Accesibilidad > Movimiento > Reducir movimiento, no hay animaciones que parpadeen.

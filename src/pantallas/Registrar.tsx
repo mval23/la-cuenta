@@ -11,6 +11,7 @@ import { fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
 import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
+import { hayMicrofono } from '../lib/voz'
 import type { Departamento, Perfil, Persona } from '../lib/tipos'
 
 interface Borrador {
@@ -60,6 +61,9 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   const [comprasCargadas, setComprasCargadas] = useState<{ dia: string; lista: CompraDelDia[] } | null>(null)
   const { aviso, mostrar, cerrar } = useAviso()
   const entrada = useRef<HTMLInputElement>(null)
+  // Se registra hablando: escribir queda escondido, salvo si no hay micrófono.
+  const conMicrofono = hayMicrofono()
+  const [escribir, setEscribir] = useState(!conMicrofono)
   const puedeAnular = perfil.rol === 'admin' || perfil.rol === 'operador'
   // La cocina solo registra lo de hoy; la base tampoco se lo permite.
   const puedeCambiarDia = puedeAnular
@@ -95,11 +99,14 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     if (data) setPersonas(data.map(({ id, nombre, departamento_id, activo }) => ({ id, nombre, departamento_id, activo })))
   }, [])
 
+  // Lo de las personas archivadas no aparece en la lista del día (ni cuenta en
+  // su total, ni lo anula "bórrala"). Sigue en su historial, en Cobrar.
   const cargarCompras = useCallback(async () => {
     const { data } = await supabase
       .from('compras')
-      .select('id, descripcion, valor_pesos, anulada, creada_en, personas(nombre), departamentos(nombre)')
+      .select('id, descripcion, valor_pesos, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)')
       .eq('fecha', dia)
+      .eq('personas.activo', true)
       .order('creada_en', { ascending: false })
     if (data) setComprasCargadas({ dia, lista: data as unknown as CompraDelDia[] })
   }, [dia])
@@ -293,27 +300,47 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                   setTexto(dicho)
                   leer(dicho)
                 }}
-                onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+                onError={(mensaje) => {
+                  mostrar({ tipo: 'error', texto: mensaje })
+                  // Si la voz falla, escribir queda a la mano.
+                  setEscribir(true)
+                }}
                 onEmpezar={cerrar}
               />
             )}
-            <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
-              O escríbelo. Por ejemplo: Juan TDH 10 mil
-            </label>
-            <div className="flex gap-3">
-              <input
-                id="frase"
-                ref={entrada}
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                autoComplete="off"
-                enterKeyHint="go"
-                className={`${campo} flex-1`}
-              />
-              <Boton type="submit" disabled={!texto.trim()}>
-                Seguir
+            {escribir ? (
+              <>
+                <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
+                  {conMicrofono ? 'O escríbelo. ' : ''}Por ejemplo: Juan TDH 10 mil
+                </label>
+                <div className="flex gap-3">
+                  <input
+                    id="frase"
+                    ref={entrada}
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    autoComplete="off"
+                    enterKeyHint="go"
+                    className={`${campo} flex-1`}
+                  />
+                  <Boton type="submit" disabled={!texto.trim()}>
+                    Seguir
+                  </Boton>
+                </div>
+              </>
+            ) : (
+              <Boton
+                variante="texto"
+                compacto
+                className="-ml-4 self-start"
+                onClick={() => {
+                  setEscribir(true)
+                  setTimeout(() => entrada.current?.focus())
+                }}
+              >
+                Prefiero escribirlo
               </Boton>
-            </div>
+            )}
             <AyudaDictado />
           </form>
         )}
@@ -335,8 +362,8 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
   if (esHoy && !abierto) {
     return (
       <div className="-my-2 flex flex-wrap items-center gap-x-3">
-        <p className="text-lg text-tinta-suave">
-          Compras de <strong className="font-semibold text-tinta">hoy</strong>, {fechaLarga(hoy)}
+        <p className="text-xl text-tinta-suave">
+          Compras de <strong className="font-semibold text-tinta">hoy, {fechaLarga(hoy)}</strong>
         </p>
         <Boton variante="texto" compacto className="-ml-2" onClick={() => setAbierto(true)}>
           ¿Son de otro día?
@@ -354,7 +381,7 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
         <p className="text-lg font-semibold">¿De qué día son las compras que vas a anotar?</p>
       ) : (
         <div>
-          <p className="text-xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
+          <p className="text-2xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
           <p className="text-base text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
         </div>
       )}
@@ -489,7 +516,6 @@ function Confirmacion({
 
   return (
     <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-linea bg-superficie p-5 shadow-sm">
-      <p className="text-base text-tinta-suave">Se entendió: «{b.textoOriginal}»</p>
 
       {/* Quién */}
       <div className="flex flex-col gap-2">
@@ -498,7 +524,7 @@ function Confirmacion({
           <div className="flex items-center gap-3">
             <p className="min-w-0 flex-1 text-2xl font-bold">
               {elegida.nombre}{' '}
-              <span className="text-xl font-normal text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
+              <span className="font-semibold text-tinta-suave">· {nombreDepto(elegida.departamento_id)}</span>
             </p>
             <Boton
               variante="secundario"
@@ -556,10 +582,10 @@ function Confirmacion({
                   key={p.id}
                   type="button"
                   onClick={() => cambiar({ personaId: p.id })}
-                  className="min-h-12 rounded-xl border border-control px-4 text-left text-lg active:bg-hundido"
+                  className="min-h-14 rounded-xl border border-control px-4 text-left text-xl active:bg-hundido"
                 >
                   <span className="font-semibold">{p.nombre}</span>{' '}
-                  <span className="text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
+                  <span className="font-semibold text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
                 </button>
               ))}
             </div>
@@ -656,7 +682,7 @@ function Confirmacion({
             Cancelar
           </Boton>
           <Boton type="submit" className="min-w-44" disabled={!listo || guardando}>
-            {guardando ? 'Guardando...' : valor > 0 ? `Guardar ${formatearPesos(valor)}` : 'Guardar'}
+            {guardando ? 'Guardando...' : 'OK'}
           </Boton>
         </div>
       )}

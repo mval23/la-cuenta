@@ -1,9 +1,11 @@
 import type { Session } from '@supabase/supabase-js'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Boton } from './componentes/Boton'
+import { estadoDelCandado, marcarUso, type EstadoCandado } from './lib/candado'
 import { supabase } from './lib/supabase'
 import type { Perfil } from './lib/tipos'
 import { Ajustes } from './pantallas/Ajustes'
+import { Bloqueado, ElegirPin, PedirPin } from './pantallas/Candado'
 import { Cobrar } from './pantallas/Cobrar'
 import { Directorio } from './pantallas/Directorio'
 import { Login } from './pantallas/Login'
@@ -72,6 +74,24 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
   const [pestana, setPestana] = useState<Pestana>('registrar')
   // Cada pestaña recuerda hasta dónde se había bajado.
   const posiciones = useRef<Record<Pestana, number>>({ registrar: 0, cobrar: 0, departamentos: 0, ajustes: 0 })
+  const [candado, setCandado] = useState<EstadoCandado>(() => estadoDelCandado(localStorage, usuarioId))
+
+  // Mientras la app está a la vista no se cierra. Al volver después de un rato
+  // sin usarla, se pide el PIN.
+  useEffect(() => {
+    if (candado !== 'abierto') return
+    function alCambiar() {
+      if (document.visibilityState === 'hidden') marcarUso(localStorage)
+      else setCandado(estadoDelCandado(localStorage, usuarioId))
+    }
+    const alSalir = () => marcarUso(localStorage)
+    document.addEventListener('visibilitychange', alCambiar)
+    window.addEventListener('pagehide', alSalir)
+    return () => {
+      document.removeEventListener('visibilitychange', alCambiar)
+      window.removeEventListener('pagehide', alSalir)
+    }
+  }, [candado, usuarioId])
 
   useEffect(() => {
     supabase
@@ -97,11 +117,17 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
 
   if (perfil === undefined) return <Cargando />
   if (perfil === null) return <SinAcceso />
+  if (candado === 'bloqueado') return <Bloqueado />
+  if (candado === 'elegir') {
+    return <ElegirPin usuarioId={usuarioId} nombre={perfil.nombre} onListo={() => setCandado('abierto')} />
+  }
 
   // Las pantallas quedan montadas: al cambiar de pestaña no se pierde lo
-  // que se estaba escribiendo ni la búsqueda.
+  // que se estaba escribiendo ni la búsqueda. El PIN las tapa sin desmontarlas.
   return (
-    <div className="flex min-h-dvh flex-col">
+    <>
+    {candado === 'cerrado' && <PedirPin nombre={perfil.nombre} onAbrir={() => setCandado('abierto')} />}
+    <div className="flex min-h-dvh flex-col" inert={candado === 'cerrado'}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-6 pb-[calc(var(--alto-pestanas)+env(safe-area-inset-bottom)+6rem)] sm:px-8 ancha:max-w-6xl ancha:px-10">
         <div hidden={pestana !== 'registrar'}>
           <Registrar perfil={perfil} activa={pestana === 'registrar'} />
@@ -142,6 +168,7 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
         </div>
       </nav>
     </div>
+    </>
   )
 }
 

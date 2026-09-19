@@ -69,3 +69,37 @@ export function nombreCompletoDelDia(dia: string, hoy = hoyBogota()): string {
   const nombre = nombreDelDia(dia, hoy)
   return diasEntre(dia, hoy) <= 2 ? `${nombre}, ${fechaLarga(dia)}` : nombre
 }
+
+// Calendario ------------------------------------------------------------------
+
+/** El mes de un día: "2026-09-17" -> "2026-09". */
+export function mesDe(dia: string): string {
+  return dia.slice(0, 7)
+}
+
+/** sumarMeses("2026-01", -1) = "2025-12" */
+export function sumarMeses(mes: string, meses: number): string {
+  const [anio, numero] = mes.split('-').map(Number)
+  const total = anio * 12 + (numero - 1) + meses
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
+/**
+ * Las semanas del mes para dibujar el calendario, de lunes a domingo. Los
+ * huecos antes del 1 y después del último día son null.
+ */
+export function semanasDelMes(mes: string): (string | null)[][] {
+  const primero = `${mes}-01`
+  const dias: (string | null)[] = Array((diaDeLaSemana(primero) + 6) % 7).fill(null)
+  for (let d = primero; mesDe(d) === mes; d = sumarDias(d, 1)) dias.push(d)
+  while (dias.length % 7 !== 0) dias.push(null)
+  return Array.from({ length: dias.length / 7 }, (_, i) => dias.slice(i * 7, i * 7 + 7))
+}
+
+const formatoMes = new Intl.DateTimeFormat('es-CO', { timeZone: 'UTC', month: 'long', year: 'numeric' })
+
+/** "Septiembre de 2026" */
+export function nombreDelMes(mes: string): string {
+  const texto = formatoMes.format(mediodia(`${mes}-01`))
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}

@@ -6,10 +6,12 @@ import { Aviso } from '../componentes/Aviso'
 import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
+import { Microfono } from '../componentes/Microfono'
 import { useAviso, type DatosAviso } from '../componentes/useAviso'
-import { normalizarNombre } from '../lib/personas'
+import { nombreDictado, normalizarNombre } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
+import { hayMicrofono } from '../lib/voz'
 import type { Departamento, Persona } from '../lib/tipos'
 
 const orden = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' })
@@ -143,6 +145,8 @@ export function Directorio({ activa }: { activa: boolean }) {
                   {agregandoEn === d.id && (
                     <AgregarPersona
                       departamento={d}
+                      personas={personas.filter((p) => p.departamento_id === d.id)}
+                      activa={activa}
                       mostrar={mostrar}
                       onAgregada={cargar}
                       onCerrar={() => setAgregandoEn(null)}
@@ -187,11 +191,16 @@ export function Directorio({ activa }: { activa: boolean }) {
 
 function AgregarPersona({
   departamento,
+  personas,
+  activa,
   mostrar,
   onAgregada,
   onCerrar,
 }: {
   departamento: Departamento
+  /** Las del departamento, para que el dictado escriba bien los apellidos conocidos. */
+  personas: Persona[]
+  activa: boolean
   mostrar: (aviso: DatosAviso) => void
   onAgregada: () => Promise<void>
   onCerrar: () => void
@@ -199,10 +208,12 @@ function AgregarPersona({
   const [nombre, setNombre] = useState('')
   const [guardando, setGuardando] = useState(false)
   const entrada = useRef<HTMLInputElement>(null)
+  const conMicrofono = hayMicrofono()
 
+  // Con micrófono no se abre el teclado solo: taparía media pantalla.
   useEffect(() => {
-    entrada.current?.focus()
-  }, [])
+    if (!conMicrofono) entrada.current?.focus()
+  }, [conMicrofono])
 
   async function agregar(e: FormEvent) {
     e.preventDefault()
@@ -224,14 +235,25 @@ function AgregarPersona({
     // Se queda abierto: casi siempre se agregan varias del mismo departamento.
     setNombre('')
     mostrar({ tipo: 'ok', texto: `Se agregó a ${limpio} en ${departamento.nombre}.` })
-    entrada.current?.focus()
+    if (!conMicrofono) entrada.current?.focus()
     await onAgregada()
   }
 
   return (
     <form onSubmit={agregar} className="flex flex-col gap-3 rounded-xl bg-marca-suave p-4">
-      <label htmlFor={`nueva-${departamento.id}`} className="text-lg font-semibold">
-        Persona nueva en {departamento.nombre}
+      <p className="text-lg font-semibold">Persona nueva en {departamento.nombre}</p>
+      {/* Solo en la pestaña visible, para que el micrófono no quede encendido. */}
+      {activa && (
+        <Microfono
+          texto="Tocar para decir el nombre"
+          vocabulario={() => [departamento.nombre, ...personas.map((p) => p.nombre)].join(', ')}
+          onTexto={(dicho) => setNombre(nombreDictado(dicho))}
+          onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+          onEmpezar={() => setNombre('')}
+        />
+      )}
+      <label htmlFor={`nueva-${departamento.id}`} className="text-base text-tinta-suave">
+        {conMicrofono ? 'Revisa el nombre antes de agregar, o escríbelo:' : 'Nombre y apellido'}
       </label>
       <div className="flex flex-wrap gap-3">
         <input
