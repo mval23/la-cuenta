@@ -18,11 +18,14 @@ export function Microfono({
   onTexto,
   onError,
   onEmpezar,
+  texto = 'Tocar para hablar',
 }: {
   vocabulario: () => string
   onTexto: (texto: string) => void
   onError: (mensaje: string) => void
   onEmpezar: () => void
+  /** Lo que dice el botón antes de tocarlo. */
+  texto?: string
 }) {
   const [estado, setEstado] = useState<Estado>('lista')
   const grabacion = useRef<Grabacion | null>(null)
@@ -83,7 +86,7 @@ export function Microfono({
     procesando: 'bg-hundido text-tinta-suave',
   }
   const textos: Record<Estado, string> = {
-    lista: 'Tocar para hablar',
+    lista: texto,
     grabando: 'Te escucho... habla ahora',
     procesando: 'Entendiendo...',
   }

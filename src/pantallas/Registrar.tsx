@@ -11,6 +11,7 @@ import { fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
 import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
+import { hayMicrofono } from '../lib/voz'
 import type { Departamento, Perfil, Persona } from '../lib/tipos'
 
 interface Borrador {
@@ -60,6 +61,9 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   const [comprasCargadas, setComprasCargadas] = useState<{ dia: string; lista: CompraDelDia[] } | null>(null)
   const { aviso, mostrar, cerrar } = useAviso()
   const entrada = useRef<HTMLInputElement>(null)
+  // Se registra hablando: escribir queda escondido, salvo si no hay micrófono.
+  const conMicrofono = hayMicrofono()
+  const [escribir, setEscribir] = useState(!conMicrofono)
   const puedeAnular = perfil.rol === 'admin' || perfil.rol === 'operador'
   // La cocina solo registra lo de hoy; la base tampoco se lo permite.
   const puedeCambiarDia = puedeAnular
@@ -296,27 +300,47 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                   setTexto(dicho)
                   leer(dicho)
                 }}
-                onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+                onError={(mensaje) => {
+                  mostrar({ tipo: 'error', texto: mensaje })
+                  // Si la voz falla, escribir queda a la mano.
+                  setEscribir(true)
+                }}
                 onEmpezar={cerrar}
               />
             )}
-            <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
-              O escríbelo. Por ejemplo: Juan TDH 10 mil
-            </label>
-            <div className="flex gap-3">
-              <input
-                id="frase"
-                ref={entrada}
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                autoComplete="off"
-                enterKeyHint="go"
-                className={`${campo} flex-1`}
-              />
-              <Boton type="submit" disabled={!texto.trim()}>
-                Seguir
+            {escribir ? (
+              <>
+                <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
+                  {conMicrofono ? 'O escríbelo. ' : ''}Por ejemplo: Juan TDH 10 mil
+                </label>
+                <div className="flex gap-3">
+                  <input
+                    id="frase"
+                    ref={entrada}
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    autoComplete="off"
+                    enterKeyHint="go"
+                    className={`${campo} flex-1`}
+                  />
+                  <Boton type="submit" disabled={!texto.trim()}>
+                    Seguir
+                  </Boton>
+                </div>
+              </>
+            ) : (
+              <Boton
+                variante="texto"
+                compacto
+                className="-ml-4 self-start"
+                onClick={() => {
+                  setEscribir(true)
+                  setTimeout(() => entrada.current?.focus())
+                }}
+              >
+                Prefiero escribirlo
               </Boton>
-            </div>
+            )}
             <AyudaDictado />
           </form>
         )}
