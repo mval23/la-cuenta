@@ -516,7 +516,6 @@ function Confirmacion({
 
   return (
     <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-linea bg-superficie p-5 shadow-sm">
-      <p className="text-base text-tinta-suave">Se entendió: «{b.textoOriginal}»</p>
 
       {/* Quién */}
       <div className="flex flex-col gap-2">
