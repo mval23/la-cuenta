@@ -95,11 +95,14 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     if (data) setPersonas(data.map(({ id, nombre, departamento_id, activo }) => ({ id, nombre, departamento_id, activo })))
   }, [])
 
+  // Lo de las personas archivadas no aparece en la lista del día (ni cuenta en
+  // su total, ni lo anula "bórrala"). Sigue en su historial, en Cobrar.
   const cargarCompras = useCallback(async () => {
     const { data } = await supabase
       .from('compras')
-      .select('id, descripcion, valor_pesos, anulada, creada_en, personas(nombre), departamentos(nombre)')
+      .select('id, descripcion, valor_pesos, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)')
       .eq('fecha', dia)
+      .eq('personas.activo', true)
       .order('creada_en', { ascending: false })
     if (data) setComprasCargadas({ dia, lista: data as unknown as CompraDelDia[] })
   }, [dia])
