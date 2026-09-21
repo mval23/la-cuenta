@@ -20,7 +20,8 @@ function mayuscula(texto: string): string {
 /**
  * Botón con el día elegido que abre un calendario propio, con letra grande: el
  * selector del iPad sale con letra muy pequeña. Solo deja elegir entre hoy y
- * DIAS_ATRAS_PERMITIDOS días atrás, lo mismo que acepta la base.
+ * `diasAtras` días atrás; por defecto DIAS_ATRAS_PERMITIDOS, lo mismo que la
+ * base acepta para una compra.
  */
 export function ElegirDia({
   dia,
@@ -29,6 +30,7 @@ export function ElegirDia({
   etiqueta,
   resaltado = false,
   grande = false,
+  diasAtras = DIAS_ATRAS_PERMITIDOS,
   className = '',
 }: {
   dia: string
@@ -39,6 +41,7 @@ export function ElegirDia({
   /** Con el color de aviso: la compra no es de hoy. */
   resaltado?: boolean
   grande?: boolean
+  diasAtras?: number
   className?: string
 }) {
   const [abierto, setAbierto] = useState(false)
@@ -65,7 +68,7 @@ export function ElegirDia({
         </svg>
         <span className="min-w-0 flex-1 leading-tight">{mayuscula(nombreCompletoDelDia(dia, hoy))}</span>
       </button>
-      {abierto && <Calendario dia={dia} hoy={hoy} titulo={etiqueta} onElegir={elegir} onCerrar={() => setAbierto(false)} />}
+      {abierto && <Calendario dia={dia} hoy={hoy} diasAtras={diasAtras} titulo={etiqueta} onElegir={elegir} onCerrar={() => setAbierto(false)} />}
     </>
   )
 }
@@ -73,17 +76,19 @@ export function ElegirDia({
 function Calendario({
   dia,
   hoy,
+  diasAtras,
   titulo,
   onElegir,
   onCerrar,
 }: {
   dia: string
   hoy: string
+  diasAtras: number
   titulo: string
   onElegir: (dia: string) => void
   onCerrar: () => void
 }) {
-  const minimo = sumarDias(hoy, -DIAS_ATRAS_PERMITIDOS)
+  const minimo = sumarDias(hoy, -diasAtras)
   const [mes, setMes] = useState(mesDe(dia))
   const hayAnterior = sumarMeses(mes, -1) >= mesDe(minimo)
   const haySiguiente = sumarMeses(mes, 1) <= mesDe(hoy)

@@ -24,7 +24,8 @@ export interface Detector {
   huboVoz: () => boolean
 }
 
-export function crearDetector(): Detector {
+/** `silencioFinalMs`: más largo cuando se explica algo con pausas para pensar. */
+export function crearDetector(silencioFinalMs = SILENCIO_FINAL_MS): Detector {
   let ruido: number | null = null
   let transcurrido = 0
   let vozSeguida = 0
@@ -48,7 +49,7 @@ export function crearDetector(): Detector {
         ruido += (volumen - ruido) * 0.05
       }
 
-      if (huboVoz) return silencio >= SILENCIO_FINAL_MS ? 'termino' : 'sigue'
+      if (huboVoz) return silencio >= silencioFinalMs ? 'termino' : 'sigue'
       return transcurrido >= ESPERA_SIN_VOZ_MS ? 'sin-voz' : 'sigue'
     },
     huboVoz: () => huboVoz,

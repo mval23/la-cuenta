@@ -2,7 +2,7 @@
 // (api/transcribir.ts). El motor de voz vive en el servidor, así que se puede
 // cambiar sin tocar la app.
 
-import { crearDetector, volumen } from './silencio'
+import { crearDetector, SILENCIO_FINAL_MS, volumen } from './silencio'
 import { supabase } from './supabase'
 
 // Tope por si el detector de silencio nunca decide (ruido constante).
@@ -26,7 +26,21 @@ export function hayMicrofono(): boolean {
   return typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
-export async function empezarGrabacion(alCortarse: (motivo: Corte) => void): Promise<Grabacion> {
+export interface Tiempos {
+  duracionMaximaMs: number
+  silencioFinalMs: number
+}
+
+/** Para frases cortas, como anotar una compra. */
+export const TIEMPOS_CORTOS: Tiempos = { duracionMaximaMs: DURACION_MAXIMA_MS, silencioFinalMs: SILENCIO_FINAL_MS }
+
+/** Para explicar algo largo, como una cuenta de cobro: aguanta pausas para pensar. */
+export const TIEMPOS_LARGOS: Tiempos = { duracionMaximaMs: 120_000, silencioFinalMs: 3_500 }
+
+export async function empezarGrabacion(
+  alCortarse: (motivo: Corte) => void,
+  tiempos: Tiempos = TIEMPOS_CORTOS,
+): Promise<Grabacion> {
   // Se crea antes del primer await: Safari solo deja activar el audio si nace
   // del toque de la usuaria.
   const contexto = new AudioContext()
@@ -59,7 +73,7 @@ export async function empezarGrabacion(alCortarse: (motivo: Corte) => void): Pro
   contexto.createMediaStreamSource(flujo).connect(analizador)
   void contexto.resume()
   const muestras = new Float32Array(analizador.fftSize)
-  const detector = crearDetector()
+  const detector = crearDetector(tiempos.silencioFinalMs)
   let cortada = false
   function cortar(motivo: Corte) {
     if (cortada) return
@@ -74,7 +88,7 @@ export async function empezarGrabacion(alCortarse: (motivo: Corte) => void): Pro
     else if (decision === 'sin-voz') cortar('sin-voz')
   }, CADA_MS)
 
-  const corte = setTimeout(() => cortar('tiempo'), DURACION_MAXIMA_MS)
+  const corte = setTimeout(() => cortar('tiempo'), tiempos.duracionMaximaMs)
   grabadora.start()
 
   function detener() {

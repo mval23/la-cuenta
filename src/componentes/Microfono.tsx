@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  DURACION_MAXIMA_MS,
   empezarGrabacion,
   ErrorDeVoz,
   hayMicrofono,
   transcribir,
   type Corte,
   type Grabacion,
+  type Tiempos,
+  TIEMPOS_CORTOS,
 } from '../lib/voz'
 
 type Estado = 'lista' | 'grabando' | 'procesando'
@@ -19,6 +20,7 @@ export function Microfono({
   onError,
   onEmpezar,
   texto = 'Tocar para hablar',
+  tiempos = TIEMPOS_CORTOS,
 }: {
   vocabulario: () => string
   onTexto: (texto: string) => void
@@ -26,6 +28,8 @@ export function Microfono({
   onEmpezar: () => void
   /** Lo que dice el botón antes de tocarlo. */
   texto?: string
+  /** Cuánto puede durar y cuánto silencio indica que terminó. */
+  tiempos?: Tiempos
 }) {
   const [estado, setEstado] = useState<Estado>('lista')
   const grabacion = useRef<Grabacion | null>(null)
@@ -41,14 +45,14 @@ export function Microfono({
     const reloj = window.setInterval(() => setAhora(Date.now()), 1000)
     return () => window.clearInterval(reloj)
   }, [estado])
-  const quedan = Math.max(0, Math.round((DURACION_MAXIMA_MS - (ahora - inicio)) / 1000))
+  const quedan = Math.max(0, Math.round((tiempos.duracionMaximaMs - (ahora - inicio)) / 1000))
 
   if (!hayMicrofono()) return null
 
   async function empezar() {
     onEmpezar()
     try {
-      grabacion.current = await empezarGrabacion((motivo) => terminar(motivo))
+      grabacion.current = await empezarGrabacion((motivo) => terminar(motivo), tiempos)
       const momento = Date.now()
       setInicio(momento)
       setAhora(momento)

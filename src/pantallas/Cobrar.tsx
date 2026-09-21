@@ -9,7 +9,11 @@ import { agruparParaCobro } from '../lib/cobro'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Perfil, Saldo } from '../lib/tipos'
+import { CuentaDeCobro } from './CuentaDeCobro'
 import { DetallePersona } from './DetallePersona'
+import { PdfQuincena } from './PdfQuincena'
+
+type Vista = 'lista' | 'quincena' | 'cuentaDeCobro'
 
 export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
   const [saldos, setSaldos] = useState<Saldo[] | null>(null)
@@ -19,6 +23,8 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   // Quien pagó mientras la pantalla está abierta se queda en la lista.
   const [pagadas, setPagadas] = useState<ReadonlySet<number>>(new Set())
   const [plegados, setPlegados] = useState<ReadonlySet<number>>(new Set())
+  // Los documentos en PDF se abren en lugar de la lista.
+  const [vista, setVista] = useState<Vista>('lista')
   const { aviso, mostrar, cerrar } = useAviso()
   const posicionDeLista = useRef(0)
   // En horizontal, la lista y el historial van lado a lado.
@@ -44,6 +50,10 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
     if (!ancha) window.scrollTo(0, abierta === null ? posicionDeLista.current : 0)
   }, [abierta, ancha])
 
+  useLayoutEffect(() => {
+    window.scrollTo(0, vista === 'lista' ? posicionDeLista.current : 0)
+  }, [vista])
+
   if (perfil.rol === 'cocina') {
     return (
       <section className="flex flex-col gap-4">
@@ -56,6 +66,12 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   function abrir(personaId: number) {
     posicionDeLista.current = window.scrollY
     setAbierta(personaId)
+  }
+
+  function irA(nueva: Vista) {
+    cerrar()
+    if (vista === 'lista') posicionDeLista.current = window.scrollY
+    setVista(nueva)
   }
 
   function alternar(departamentoId: number) {
@@ -93,6 +109,20 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   }
 
   const avisoFlotante = <Aviso aviso={aviso} onCerrar={cerrar} />
+
+  if (vista !== 'lista') {
+    const volver = () => irA('lista')
+    return (
+      <>
+        {vista === 'quincena' ? (
+          <PdfQuincena onVolver={volver} onError={(texto) => mostrar({ tipo: 'error', texto })} />
+        ) : (
+          <CuentaDeCobro onVolver={volver} mostrar={mostrar} />
+        )}
+        {avisoFlotante}
+      </>
+    )
+  }
 
   if (saldos === null) {
     return errorDeCarga ? (
@@ -132,6 +162,15 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
         <p className="text-lg text-tinta-suave">
           Por cobrar <span className="font-semibold text-tinta tabular-nums">{formatearPesos(porCobrar)}</span>
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Boton variante="secundario" onClick={() => irA('quincena')}>
+          PDF de la quincena
+        </Boton>
+        <Boton variante="secundario" onClick={() => irA('cuentaDeCobro')}>
+          Cuenta de cobro
+        </Boton>
       </div>
 
       <input
