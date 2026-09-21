@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
-import { ElegirDia } from '../componentes/ElegirDia'
+import { Calendario, ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
 import { leerDictado } from '../lib/dictado'
-import { fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
+import { DIAS_ATRAS_PERMITIDOS, fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
 import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
@@ -169,6 +169,22 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     })
   }
 
+  // Sin dictar: la tarjeta vacía, para elegir quién y poner el valor a mano.
+  function anotarAMano() {
+    cerrar()
+    setPorAnular(null)
+    setBorrador({
+      textoOriginal: '',
+      personaId: null,
+      candidatas: [],
+      nombreNuevo: '',
+      departamentoId: null,
+      descripcion: '',
+      valor: '',
+      fecha: dia,
+    })
+  }
+
   function cancelar() {
     setBorrador(null)
     entrada.current?.focus()
@@ -187,7 +203,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
         persona_id: personaId,
         descripcion: b.descripcion.trim() || null,
         valor_pesos: Number(b.valor),
-        texto_original: b.textoOriginal,
+        texto_original: b.textoOriginal || null,
         fecha: b.fecha,
       })
       .select('id')
@@ -341,7 +357,9 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                 Prefiero escribirlo
               </Boton>
             )}
-            <AyudaDictado />
+            <Boton variante="tintado" className="self-start" onClick={anotarAMano}>
+              Anotar a mano
+            </Boton>
           </form>
         )}
       </div>
@@ -356,98 +374,61 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
 // Día en que se anota ---------------------------------------------------------
 
 function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCambiar: (dia: string) => void }) {
-  const [abierto, setAbierto] = useState(false)
-  const esHoy = dia === hoy
+  const [calendario, setCalendario] = useState(false)
 
-  if (esHoy && !abierto) {
+  if (dia === hoy) {
+    // La fecha y "Cambiar" abren el calendario de una vez.
     return (
       <div className="-my-2 flex flex-wrap items-center gap-x-3">
         <p className="text-xl text-tinta-suave">
-          Compras de <strong className="font-semibold text-tinta">hoy, {fechaLarga(hoy)}</strong>
+          Compras de{' '}
+          <button
+            type="button"
+            onClick={() => setCalendario(true)}
+            aria-haspopup="dialog"
+            className="rounded-md font-semibold text-tinta active:bg-hundido"
+          >
+            hoy, {fechaLarga(hoy)}
+          </button>
         </p>
-        <Boton variante="texto" compacto className="-ml-2" onClick={() => setAbierto(true)}>
-          ¿Son de otro día?
+        <Boton variante="texto" compacto className="-ml-2" aria-haspopup="dialog" onClick={() => setCalendario(true)}>
+          Cambiar
         </Boton>
+        {calendario && (
+          <Calendario
+            dia={dia}
+            hoy={hoy}
+            diasAtras={DIAS_ATRAS_PERMITIDOS}
+            titulo="Día de las compras"
+            onElegir={(nuevo) => {
+              setCalendario(false)
+              onCambiar(nuevo)
+            }}
+            onCerrar={() => setCalendario(false)}
+          />
+        )}
       </div>
     )
   }
 
   return (
-    <div
-      className={`flex flex-col gap-3 rounded-xl p-4 ${esHoy ? 'bg-hundido' : 'border-2 border-aviso bg-aviso-suave'}`}
-      role={esHoy ? undefined : 'status'}
-    >
-      {esHoy ? (
-        <p className="text-lg font-semibold">¿De qué día son las compras que vas a anotar?</p>
-      ) : (
-        <div>
-          <p className="text-2xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
-          <p className="text-base text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
-        </div>
-      )}
+    <div className="flex flex-col gap-3 rounded-xl border-2 border-aviso bg-aviso-suave p-4" role="status">
+      <div>
+        <p className="text-2xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
+        <p className="text-base text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
+      </div>
       <div className="flex flex-wrap gap-3">
         <ElegirDia
           dia={dia}
           hoy={hoy}
           etiqueta="Día de las compras"
           className="min-w-0 flex-1 basis-64"
-          onCambiar={(nuevo) => {
-            onCambiar(nuevo)
-            setAbierto(false)
-          }}
+          onCambiar={onCambiar}
         />
-        {esHoy ? (
-          <Boton variante="secundario" onClick={() => setAbierto(false)}>
-            Son de hoy
-          </Boton>
-        ) : (
-          <Boton variante="secundario" onClick={() => onCambiar(hoy)}>
-            Volver a hoy
-          </Boton>
-        )}
+        <Boton variante="secundario" onClick={() => onCambiar(hoy)}>
+          Volver a hoy
+        </Boton>
       </div>
-    </div>
-  )
-}
-
-// Ayuda para dictar -----------------------------------------------------------
-
-const EJEMPLOS: [string, string][] = [
-  ['Carlos 12', 'Carlos, 12 mil'],
-  ['Juan TDH 10 mil', 'si hay dos Juan, con el departamento'],
-  ['Pedro de Mantenimiento un tinto a mil quinientos', 'con lo que llevó'],
-  ['Ayer, Ana Bodega 15', 'una compra de otro día'],
-  ['El martes', 'desde ahora, todo queda del martes'],
-  ['Bórrala', 'anula la última compra'],
-]
-
-function AyudaDictado() {
-  const [abierta, setAbierta] = useState(false)
-
-  return (
-    <div className="flex flex-col items-start gap-2">
-      <Boton variante="texto" compacto className="-ml-4" aria-expanded={abierta} onClick={() => setAbierta(!abierta)}>
-        {abierta ? 'Ocultar la ayuda' : '¿Cómo se dicta?'}
-      </Boton>
-      {abierta && (
-        <div className="flex w-full flex-col gap-3 rounded-xl bg-hundido p-4">
-          <p className="text-lg">
-            Basta con <strong>quién</strong> y <strong>cuánto</strong>. Si hace falta, también el departamento, qué
-            llevó y el día. «12» se entiende como 12 mil.
-          </p>
-          <ul className="flex flex-col gap-1.5">
-            {EJEMPLOS.map(([ejemplo, explicacion]) => (
-              <li key={ejemplo} className="rounded-lg bg-superficie px-3 py-2 text-lg">
-                «{ejemplo}» <span className="text-base text-tinta-suave">· {explicacion}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-base text-tinta-suave">
-            Antes de guardar siempre aparece la tarjeta para revisar y corregir. Si hay dos personas con
-            el mismo nombre, la app pregunta cuál es.
-          </p>
-        </div>
-      )}
     </div>
   )
 }
@@ -474,14 +455,53 @@ function Confirmacion({
   onCancelar: () => void
 }) {
   const [guardando, setGuardando] = useState(false)
-  // Con sugerencias, primero se muestran solo ellas; la persona nueva, si se pide.
-  const [otraPersona, setOtraPersona] = useState(false)
+  // Cómo se elige quién: entre las sugeridas del dictado, buscando entre las que
+  // ya existen o anotando una persona nueva. A mano se empieza buscando.
+  const [modo, setModo] = useState<'sugeridas' | 'buscar' | 'nueva'>(
+    b.candidatas.length > 0 ? 'sugeridas' : b.nombreNuevo.trim() !== '' ? 'nueva' : 'buscar',
+  )
+  const [busqueda, setBusqueda] = useState('')
   // Casi nunca se dice qué llevó: el campo aparece solo si se dijo o se pide.
   const [conDescripcion, setConDescripcion] = useState(b.descripcion !== '')
   const cambiar = (cambios: Partial<Borrador>) => onCambiar({ ...b, ...cambios })
   const nombreDepto = (id: number) => departamentos.find((d) => d.id === id)?.nombre ?? ''
   const elegida = personas.find((p) => p.id === b.personaId) ?? null
-  const personaNueva = elegida === null && (b.candidatas.length === 0 || otraPersona)
+  const personaNueva = elegida === null && modo === 'nueva'
+  // Cada palabra buscada debe estar en el nombre o en el departamento: «juan tdh».
+  const palabras = normalizarNombre(busqueda).split(' ').filter(Boolean)
+  const encontradas =
+    palabras.length === 0
+      ? []
+      : personas
+          .filter((p) => {
+            const donde = normalizarNombre(`${p.nombre} ${nombreDepto(p.departamento_id)}`)
+            return palabras.every((palabra) => donde.includes(palabra))
+          })
+          .sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
+  const MAXIMO = 8
+
+  const botonPersona = (p: Persona) => (
+    <button
+      key={p.id}
+      type="button"
+      onClick={() => cambiar({ personaId: p.id })}
+      className="min-h-14 rounded-xl border border-control px-4 text-left text-xl active:bg-hundido"
+    >
+      <span className="font-semibold">{p.nombre}</span>{' '}
+      <span className="font-semibold text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
+    </button>
+  )
+
+  function buscarExistente() {
+    setBusqueda(b.nombreNuevo.trim().split(/\s+/)[0] ?? '')
+    setModo('buscar')
+  }
+
+  function anotarNueva() {
+    // Lo que se estaba buscando suele ser el nombre de la persona nueva.
+    if (b.nombreNuevo.trim() === '' && busqueda.trim() !== '') cambiar({ nombreNuevo: busqueda.trim() })
+    setModo('nueva')
+  }
   const otroDia = b.fecha !== hoy
 
   const valor = Number(b.valor)
@@ -516,6 +536,37 @@ function Confirmacion({
 
   return (
     <form onSubmit={guardar} className="flex flex-col gap-5 rounded-2xl border border-linea bg-superficie p-5 shadow-sm">
+      {/* Guardar va arriba a la derecha: se alcanza sin bajar, aunque el teclado tape el final. */}
+      {preguntando ? (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-aviso-suave p-4">
+          <div className="mr-auto">
+            <p className="text-xl font-semibold">
+              ¿Seguro que son <span className="tabular-nums">{formatearPesos(valor)}</span>?
+            </p>
+            <p className="text-base text-aviso">
+              {inusual === 'bajo'
+                ? 'Parece poco para una compra. ¿Faltó decir "mil"?'
+                : 'Parece mucho para una compra.'}
+            </p>
+          </div>
+          <Boton variante="secundario" onClick={corregirValor}>
+            Corregir
+          </Boton>
+          <Boton type="submit" disabled={guardando}>
+            {guardando ? 'Guardando...' : `Sí, son ${formatearPesos(valor)}`}
+          </Boton>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3 border-b border-linea pb-4">
+          <p className="mr-auto text-base text-aviso">{!listo && `Falta: ${faltan.join(', ')}.`}</p>
+          <Boton variante="secundario" onClick={onCancelar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" className="min-w-44" disabled={!listo || guardando}>
+            {guardando ? 'Guardando...' : 'OK'}
+          </Boton>
+        </div>
+      )}
 
       {/* Quién */}
       <div className="flex flex-col gap-2">
@@ -530,19 +581,20 @@ function Confirmacion({
               variante="secundario"
               compacto
               onClick={() => {
-                // Se ofrecen las que empiezan con el mismo nombre, además de crear una nueva.
+                // Se ofrecen las que empiezan con el mismo nombre, además de buscar o crear una nueva.
                 const primer = normalizarNombre(elegida.nombre).split(' ')[0]
                 const parecidas = personas.filter((p) => normalizarNombre(p.nombre).split(' ')[0] === primer)
-                setOtraPersona(false)
-                cambiar({ personaId: null, candidatas: b.candidatas.length > 0 ? b.candidatas : parecidas })
+                const sugeridas = b.candidatas.length > 0 ? b.candidatas : parecidas
+                setModo(sugeridas.length > 0 ? 'sugeridas' : 'buscar')
+                cambiar({ personaId: null, candidatas: sugeridas })
               }}
             >
               Cambiar
             </Boton>
           </div>
-        ) : personaNueva ? (
+        ) : modo === 'nueva' ? (
           <>
-            <p className="text-base text-tinta-suave">Persona nueva. Revisa el nombre y elige el departamento:</p>
+            <p className="text-base text-tinta-suave">Persona nueva. Escribe el nombre y elige el departamento:</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 value={b.nombreNuevo}
@@ -567,8 +619,41 @@ function Confirmacion({
                 ))}
               </select>
             </div>
+            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={buscarExistente}>
+              Elegir una persona que ya existe
+            </Boton>
+          </>
+        ) : modo === 'buscar' ? (
+          <>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre"
+              aria-label="Buscar una persona que ya existe"
+              autoComplete="off"
+              autoCapitalize="words"
+              autoFocus
+              className={campo}
+            />
+            {palabras.length === 0 ? (
+              <p className="text-base text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
+            ) : encontradas.length === 0 ? (
+              <p className="text-base text-tinta-suave">No hay nadie con ese nombre.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {encontradas.slice(0, MAXIMO).map(botonPersona)}
+                {encontradas.length > MAXIMO && (
+                  <p className="text-base text-tinta-suave">
+                    Hay {encontradas.length - MAXIMO} más. Escribe más del nombre o el departamento.
+                  </p>
+                )}
+              </div>
+            )}
+            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarNueva}>
+              No está: es una persona nueva
+            </Boton>
             {b.candidatas.length > 0 && (
-              <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setOtraPersona(false)}>
+              <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setModo('sugeridas')}>
                 Volver a las personas sugeridas
               </Boton>
             )}
@@ -576,20 +661,11 @@ function Confirmacion({
         ) : (
           <>
             <p className="text-base text-tinta-suave">¿Es alguna de estas personas?</p>
-            <div className="flex flex-col gap-2">
-              {b.candidatas.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => cambiar({ personaId: p.id })}
-                  className="min-h-14 rounded-xl border border-control px-4 text-left text-xl active:bg-hundido"
-                >
-                  <span className="font-semibold">{p.nombre}</span>{' '}
-                  <span className="font-semibold text-tinta-suave">· {nombreDepto(p.departamento_id)}</span>
-                </button>
-              ))}
-            </div>
-            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setOtraPersona(true)}>
+            <div className="flex flex-col gap-2">{b.candidatas.map(botonPersona)}</div>
+            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setModo('buscar')}>
+              Buscar otra persona
+            </Boton>
+            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarNueva}>
               No es ninguna: es una persona nueva
             </Boton>
           </>
@@ -654,37 +730,6 @@ function Confirmacion({
         <Boton variante="texto" compacto className="-my-2 -ml-4 self-start" onClick={() => setConDescripcion(true)}>
           + Anotar qué llevó
         </Boton>
-      )}
-
-      {preguntando ? (
-        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-aviso-suave p-4">
-          <div className="mr-auto">
-            <p className="text-xl font-semibold">
-              ¿Seguro que son <span className="tabular-nums">{formatearPesos(valor)}</span>?
-            </p>
-            <p className="text-base text-aviso">
-              {inusual === 'bajo'
-                ? 'Parece poco para una compra. ¿Faltó decir "mil"?'
-                : 'Parece mucho para una compra.'}
-            </p>
-          </div>
-          <Boton variante="secundario" onClick={corregirValor}>
-            Corregir
-          </Boton>
-          <Boton type="submit" disabled={guardando}>
-            {guardando ? 'Guardando...' : `Sí, son ${formatearPesos(valor)}`}
-          </Boton>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-4">
-          <p className="mr-auto text-base text-aviso">{!listo && `Falta: ${faltan.join(', ')}.`}</p>
-          <Boton variante="secundario" onClick={onCancelar}>
-            Cancelar
-          </Boton>
-          <Boton type="submit" className="min-w-44" disabled={!listo || guardando}>
-            {guardando ? 'Guardando...' : 'OK'}
-          </Boton>
-        </div>
       )}
     </form>
   )
