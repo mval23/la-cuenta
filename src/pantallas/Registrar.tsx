@@ -343,6 +343,10 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                     Seguir
                   </Boton>
                 </div>
+                {/* Escondido como escribir: sin dictar ni frase, eligiendo quién y cuánto. */}
+                <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarAMano}>
+                  Anotar a mano
+                </Boton>
               </>
             ) : (
               <Boton
@@ -357,9 +361,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                 Prefiero escribirlo
               </Boton>
             )}
-            <Boton variante="tintado" className="self-start" onClick={anotarAMano}>
-              Anotar a mano
-            </Boton>
           </form>
         )}
       </div>
