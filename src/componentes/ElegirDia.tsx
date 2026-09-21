@@ -73,7 +73,8 @@ export function ElegirDia({
   )
 }
 
-function Calendario({
+/** El calendario solo, para abrirlo desde otro botón. */
+export function Calendario({
   dia,
   hoy,
   diasAtras,
