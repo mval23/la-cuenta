@@ -35,6 +35,7 @@ function fechaCorta(fecha: string): string {
 export function DetallePersona({
   saldo: s,
   enPanel,
+  volverA = 'Cobrar',
   onVolver,
   onCambio,
   mostrar,
@@ -42,6 +43,8 @@ export function DetallePersona({
   saldo: Saldo
   /** En horizontal va al lado de la lista en vez de reemplazarla. */
   enPanel: boolean
+  /** La pantalla a la que lleva "Volver". */
+  volverA?: string
   onVolver: () => void
   onCambio: () => Promise<void>
   mostrar: (aviso: DatosAviso) => void
@@ -132,7 +135,7 @@ export function DetallePersona({
     <section className="flex flex-col gap-5">
       {!enPanel && (
         <Boton variante="texto" className="-ml-3 self-start" onClick={onVolver}>
-          <span aria-hidden="true">‹ </span>Volver a Cobrar
+          <span aria-hidden="true">‹ </span>Volver a {volverA}
         </Boton>
       )}
 

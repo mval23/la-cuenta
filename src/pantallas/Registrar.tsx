@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
@@ -12,7 +12,8 @@ import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import { hayMicrofono } from '../lib/voz'
-import type { Departamento, Perfil, Persona } from '../lib/tipos'
+import type { Departamento, Perfil, Persona, Saldo } from '../lib/tipos'
+import { DetallePersona } from './DetallePersona'
 
 interface Borrador {
   textoOriginal: string
@@ -29,6 +30,7 @@ interface Borrador {
 
 interface CompraDelDia {
   id: number
+  persona_id: number
   descripcion: string | null
   valor_pesos: number
   anulada: boolean
@@ -57,6 +59,9 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   const [texto, setTexto] = useState('')
   const [borrador, setBorrador] = useState<Borrador | null>(null)
   const [porAnular, setPorAnular] = useState<CompraDelDia | null>(null)
+  // Al tocar una compra del día se ve todo lo de esa persona, en lugar de Registrar.
+  const [abierta, setAbierta] = useState<Saldo | null>(null)
+  const posicionDeRegistrar = useRef(0)
   // Con el día al que pertenecen: al cambiar de día no se muestran las del anterior.
   const [comprasCargadas, setComprasCargadas] = useState<{ dia: string; lista: CompraDelDia[] } | null>(null)
   const { aviso, mostrar, cerrar } = useAviso()
@@ -104,7 +109,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   const cargarCompras = useCallback(async () => {
     const { data } = await supabase
       .from('compras')
-      .select('id, descripcion, valor_pesos, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)')
+      .select('id, persona_id, descripcion, valor_pesos, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)')
       .eq('fecha', dia)
       .eq('personas.activo', true)
       .order('creada_en', { ascending: false })
@@ -121,6 +126,12 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   useEffect(() => {
     if (activa) cargarCompras()
   }, [activa, cargarCompras])
+
+  // El historial abre desde arriba; al volver, Registrar queda donde estaba.
+  const hayAbierta = abierta !== null
+  useLayoutEffect(() => {
+    window.scrollTo(0, hayAbierta ? 0 : posicionDeRegistrar.current)
+  }, [hayAbierta])
 
   function alEnviar(e: FormEvent) {
     e.preventDefault()
@@ -271,11 +282,55 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     })
   }
 
+  async function cargarSaldo(personaId: number): Promise<Saldo | null> {
+    const { data } = await supabase
+      .from('saldos')
+      .select('persona_id, nombre, departamento_id, departamento, activo, comprado, pagado, saldo')
+      .eq('persona_id', personaId)
+      .maybeSingle()
+    return data
+  }
+
+  async function abrirPersona(personaId: number) {
+    cerrar()
+    const saldo = await cargarSaldo(personaId)
+    if (!saldo) {
+      mostrar({ tipo: 'error', texto: 'No se pudo abrir. Revisa el internet e intenta otra vez.' })
+      return
+    }
+    posicionDeRegistrar.current = window.scrollY
+    setAbierta(saldo)
+  }
+
+  // Lo que se anula en el historial puede ser una compra de la lista del día.
+  async function alCambiarDetalle() {
+    if (!abierta) return
+    const [saldo] = await Promise.all([cargarSaldo(abierta.persona_id), cargarCompras()])
+    if (saldo) setAbierta(saldo)
+  }
+
   if (departamentos === null) {
     return errorDeCarga ? (
       <ErrorDeCarga texto="No se pudieron cargar los departamentos." onReintentar={cargarDepartamentos} />
     ) : (
       <p className="text-lg text-tinta-suave">Cargando...</p>
+    )
+  }
+
+  if (abierta) {
+    return (
+      <>
+        <DetallePersona
+          key={abierta.persona_id}
+          saldo={abierta}
+          enPanel={false}
+          volverA="Registrar"
+          onVolver={() => setAbierta(null)}
+          onCambio={alCambiarDetalle}
+          mostrar={mostrar}
+        />
+        <Aviso aviso={aviso} onCerrar={cerrar} />
+      </>
     )
   }
 
@@ -365,7 +420,15 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
         )}
       </div>
 
-      <ComprasDelDia dia={dia} hoy={hoy} compras={compras} puedeAnular={puedeAnular} onAnular={anular} />
+      <ComprasDelDia
+        dia={dia}
+        hoy={hoy}
+        compras={compras}
+        puedeAnular={puedeAnular}
+        onAnular={anular}
+        // La cocina no ve saldos ni pagos: para ella la lista no abre nada.
+        onAbrir={puedeAnular ? abrirPersona : undefined}
+      />
 
       <Aviso aviso={aviso} onCerrar={cerrar} />
     </section>
@@ -772,12 +835,15 @@ function ComprasDelDia({
   compras,
   puedeAnular,
   onAnular,
+  onAbrir,
 }: {
   dia: string
   hoy: string
   compras: CompraDelDia[] | null
   puedeAnular: boolean
   onAnular: (c: CompraDelDia) => Promise<void>
+  /** Abre todo lo de la persona de esa compra. */
+  onAbrir?: (personaId: number) => void
 }) {
   const [confirmando, setConfirmando] = useState<number | null>(null)
   const titulo = mayuscula(nombreDelDia(dia, hoy))
@@ -809,20 +875,24 @@ function ComprasDelDia({
       <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
         {compras.map((c) => (
           <li key={c.id}>
-            <div className="flex items-center gap-3 py-2 pr-3 pl-4">
-              <div className={`min-w-0 flex-1 ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
-                <p className="text-lg">
-                  <span className="font-semibold">{c.personas?.nombre}</span>{' '}
-                  <span className={c.anulada ? '' : 'text-tinta-suave'}>· {c.departamentos?.nombre}</span>
-                </p>
-                <p className={`text-base ${c.anulada ? '' : 'text-tinta-suave'}`}>
-                  {c.descripcion && `${c.descripcion} · `}
-                  {dia === hoy ? hora(c.creada_en) : `anotada a las ${hora(c.creada_en)}`}
-                </p>
-              </div>
-              <span className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
-                {formatearPesos(c.valor_pesos)}
-              </span>
+            <div className="flex items-center gap-3 pr-3">
+              <Renglon onClick={onAbrir && (() => onAbrir(c.persona_id))}>
+                <div className={`min-w-0 flex-1 ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
+                  <p className="text-lg">
+                    <span className="font-semibold">{c.personas?.nombre}</span>{' '}
+                    <span className={c.anulada ? '' : 'text-tinta-suave'}>· {c.departamentos?.nombre}</span>
+                  </p>
+                  <p className={`text-base ${c.anulada ? '' : 'text-tinta-suave'}`}>
+                    {c.descripcion && `${c.descripcion} · `}
+                    {dia === hoy ? hora(c.creada_en) : `anotada a las ${hora(c.creada_en)}`}
+                  </p>
+                </div>
+                <span
+                  className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}
+                >
+                  {formatearPesos(c.valor_pesos)}
+                </span>
+              </Renglon>
               {c.anulada ? (
                 <span className="w-24 text-center text-base text-tinta-suave">Anulada</span>
               ) : (
@@ -861,5 +931,16 @@ function ComprasDelDia({
         ))}
       </ul>
     </div>
+  )
+}
+
+/** El renglón de una compra: si se puede abrir la persona, todo él es un botón. */
+function Renglon({ onClick, children }: { onClick?: () => void; children: ReactNode }) {
+  const clases = 'flex min-w-0 flex-1 items-center gap-3 py-2 pl-4 text-left'
+  if (!onClick) return <div className={clases}>{children}</div>
+  return (
+    <button type="button" onClick={onClick} className={`${clases} active:bg-hundido`}>
+      {children}
+    </button>
   )
 }
