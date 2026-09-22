@@ -12,7 +12,7 @@ import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Departamento, Perfil, Persona, Saldo } from '../lib/tipos'
-import { DetallePersona } from './DetallePersona'
+import { DetallePersona, MOTIVO_CORREGIDA } from './DetallePersona'
 
 interface Borrador {
   textoOriginal: string
@@ -104,6 +104,8 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     const { data } = await supabase
       .from('compras')
       .select('id, persona_id, descripcion, valor_pesos, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)')
+      // Las que se corrigieron en el historial ya tienen su reemplazo en la lista.
+      .or(`anulada_motivo.is.null,anulada_motivo.neq.${MOTIVO_CORREGIDA}`)
       .eq('fecha', dia)
       .eq('personas.activo', true)
       .order('creada_en', { ascending: false })
