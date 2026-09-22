@@ -3,7 +3,9 @@ import type { DatosAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
+import { campo } from '../componentes/estilos'
 import { hoyBogota } from '../lib/fechas'
+import { normalizarNombre } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Saldo } from '../lib/tipos'
@@ -26,8 +28,25 @@ interface Movimiento {
   texto: string
   valor: number
   anulado: boolean
+  /** Qué llevó; solo en compras, y puede faltar. */
+  descripcion: string | null
   /** Lo que hace falta para anotarlo de nuevo al corregirlo. */
   copia: Record<string, unknown>
+}
+
+/** De quién es: al corregir se puede pasar a otra persona. */
+interface Quien {
+  id: number
+  nombre: string
+  departamento: string
+}
+
+/** Lo que se puede cambiar al corregir. */
+interface Correccion {
+  quien: Quien
+  valor: number
+  fecha: string
+  descripcion: string | null
 }
 
 const formatoFecha = new Intl.DateTimeFormat('es-CO', {
@@ -106,6 +125,7 @@ export function DetallePersona({
             texto: c.descripcion ?? 'Compra',
             valor: c.valor_pesos,
             anulado: c.anulada,
+            descripcion: c.descripcion,
             copia: { descripcion: c.descripcion, texto_original: c.texto_original },
           })),
         ...pagos.data
@@ -119,6 +139,7 @@ export function DetallePersona({
             texto: p.tipo === 'total' ? 'Pagó todo' : 'Abono',
             valor: p.valor_pesos,
             anulado: p.anulado,
+            descripcion: null,
             copia: { tipo: p.tipo },
           })),
         // Por día, y dentro del día lo último primero: lo corregido queda en su día.
@@ -155,12 +176,19 @@ export function DetallePersona({
     })
   }
 
-  /** Anota uno nuevo con el valor y el día corregidos, y anula el viejo. */
-  async function corregir(m: Movimiento, valor: number, fecha: string): Promise<boolean> {
+  /** Anota uno nuevo con lo corregido y anula el viejo. */
+  async function corregir(m: Movimiento, { quien, valor, fecha, descripcion }: Correccion): Promise<boolean> {
     const que = m.tabla === 'pagos' ? 'el pago' : 'la compra'
+    const aOtra = quien.id !== s.persona_id
     const { data: nuevo, error } = await supabase
       .from(m.tabla)
-      .insert({ ...m.copia, persona_id: s.persona_id, valor_pesos: valor, fecha })
+      .insert({
+        ...m.copia,
+        ...(m.tabla === 'compras' ? { descripcion } : {}),
+        persona_id: quien.id,
+        valor_pesos: valor,
+        fecha,
+      })
       .select('id')
       .single()
     if (error) {
@@ -182,7 +210,9 @@ export function DetallePersona({
     await Promise.all([cargar(), onCambio()])
     mostrar({
       tipo: 'ok',
-      texto: `Se corrigió ${que}: ${formatearPesos(valor)}, ${fechaCorta(fecha)}`,
+      texto: aOtra
+        ? `Se pasó ${que} a ${quien.nombre}: ${formatearPesos(valor)}, ${fechaCorta(fecha)}`
+        : `Se corrigió ${que}: ${formatearPesos(valor)}, ${fechaCorta(fecha)}`,
       deshacer: async () => {
         const [a, b] = await Promise.all([
           supabase.from(m.tabla).update(anulacion(m.tabla, true, MOTIVO_CORREGIDA)).eq('id', nuevo.id),
@@ -239,7 +269,7 @@ export function DetallePersona({
 
       {movimientos && movimientos.length > 0 && (
         <>
-          <p className="-mb-3 text-base text-tinta-suave">Toca uno para cambiar el valor o el día.</p>
+          <p className="-mb-3 text-base text-tinta-suave">Toca uno para cambiarlo.</p>
           <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
             {movimientos.map((m) => {
               const esPago = m.tabla === 'pagos'
@@ -310,8 +340,9 @@ export function DetallePersona({
                   {editando === m.clave && (
                     <Editar
                       movimiento={m}
+                      persona={{ id: s.persona_id, nombre: s.nombre, departamento: s.departamento }}
                       onCancelar={() => setEditando(null)}
-                      onGuardar={(valor, fecha) => corregir(m, valor, fecha)}
+                      onGuardar={(correccion) => corregir(m, correccion)}
                     />
                   )}
                 </li>
@@ -326,30 +357,69 @@ export function DetallePersona({
 
 function Editar({
   movimiento: m,
+  persona,
   onCancelar,
   onGuardar,
 }: {
   movimiento: Movimiento
+  persona: Quien
   onCancelar: () => void
-  onGuardar: (valor: number, fecha: string) => Promise<boolean>
+  onGuardar: (correccion: Correccion) => Promise<boolean>
 }) {
   const [valor, setValor] = useState(String(m.valor))
   const [fecha, setFecha] = useState(m.fecha)
+  const [queLlevo, setQueLlevo] = useState(m.descripcion ?? '')
+  const [quien, setQuien] = useState(persona)
+  const [cambiandoQuien, setCambiandoQuien] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const hoy = hoyBogota()
   const numero = Number(valor)
-  const sinCambios = numero === m.valor && fecha === m.fecha
+  const descripcion = queLlevo.trim() || null
+  const sinCambios = numero === m.valor && fecha === m.fecha && descripcion === m.descripcion && quien.id === persona.id
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
     if (!(numero > 0) || sinCambios || guardando) return
     setGuardando(true)
     // Si salió bien, este formulario se cierra solo.
-    if (!(await onGuardar(numero, fecha))) setGuardando(false)
+    if (!(await onGuardar({ quien, valor: numero, fecha, descripcion }))) setGuardando(false)
   }
 
   return (
     <form onSubmit={guardar} className="flex flex-col gap-4 bg-hundido px-4 py-4">
+      <div className="flex flex-col gap-2">
+        <span className="text-base font-semibold text-tinta-suave">Quién</span>
+        {cambiandoQuien ? (
+          <BuscarPersona
+            onElegir={(q) => {
+              setQuien(q)
+              setCambiandoQuien(false)
+            }}
+            onCancelar={() => setCambiandoQuien(false)}
+          />
+        ) : (
+          <div className="flex items-center gap-3">
+            <p className="min-w-0 flex-1 text-xl font-bold">
+              {quien.nombre} <span className="font-semibold text-tinta-suave">· {quien.departamento}</span>
+            </p>
+            <Boton variante="secundario" compacto onClick={() => setCambiandoQuien(true)}>
+              Cambiar
+            </Boton>
+          </div>
+        )}
+      </div>
+      {m.tabla === 'compras' && (
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Qué llevó (si quieres)</span>
+          <input
+            value={queLlevo}
+            onChange={(e) => setQueLlevo(e.target.value)}
+            autoComplete="off"
+            placeholder="Almuerzo, tinto..."
+            className="min-h-14 rounded-xl border border-control bg-superficie px-4 text-xl outline-none placeholder:text-tinta-tenue focus:outline-3 focus:outline-offset-2 focus:outline-marca"
+          />
+        </label>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
           <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
@@ -387,5 +457,93 @@ function Editar({
         </Boton>
       </div>
     </form>
+  )
+}
+
+/** Buscar a quién pasarle una compra o un pago: por nombre, o nombre y departamento. */
+function BuscarPersona({ onElegir, onCancelar }: { onElegir: (q: Quien) => void; onCancelar: () => void }) {
+  const [personas, setPersonas] = useState<Quien[] | null>(null)
+  const [errorDeCarga, setErrorDeCarga] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+
+  const cargar = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('personas')
+      .select('id, nombre, departamentos(nombre)')
+      .eq('activo', true)
+    if (error) {
+      setErrorDeCarga(true)
+      return
+    }
+    setErrorDeCarga(false)
+    setPersonas(
+      (data as unknown as { id: number; nombre: string; departamentos: { nombre: string } | null }[]).map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        departamento: p.departamentos?.nombre ?? '',
+      })),
+    )
+  }, [])
+
+  useEffect(() => {
+    cargar()
+  }, [cargar])
+
+  const palabras = normalizarNombre(busqueda).split(' ').filter(Boolean)
+  const encontradas =
+    personas === null || palabras.length === 0
+      ? []
+      : personas
+          .filter((p) => {
+            const donde = normalizarNombre(`${p.nombre} ${p.departamento}`)
+            return palabras.every((palabra) => donde.includes(palabra))
+          })
+          .sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
+  const MAXIMO = 8
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        placeholder="Buscar por nombre"
+        aria-label="Buscar a quién pasarlo"
+        autoComplete="off"
+        autoCapitalize="words"
+        autoFocus
+        className={campo}
+      />
+      {errorDeCarga ? (
+        <ErrorDeCarga texto="No se pudo cargar las personas." onReintentar={cargar} />
+      ) : personas === null ? (
+        <p className="text-base text-tinta-suave">Cargando...</p>
+      ) : palabras.length === 0 ? (
+        <p className="text-base text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
+      ) : encontradas.length === 0 ? (
+        <p className="text-base text-tinta-suave">No hay nadie con ese nombre.</p>
+      ) : (
+        <>
+          {encontradas.slice(0, MAXIMO).map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onElegir(p)}
+              className="min-h-14 rounded-xl border border-control bg-superficie px-4 text-left text-xl active:bg-hundido"
+            >
+              <span className="font-semibold">{p.nombre}</span>{' '}
+              <span className="font-semibold text-tinta-suave">· {p.departamento}</span>
+            </button>
+          ))}
+          {encontradas.length > MAXIMO && (
+            <p className="text-base text-tinta-suave">
+              Hay {encontradas.length - MAXIMO} más. Escribe más del nombre o el departamento.
+            </p>
+          )}
+        </>
+      )}
+      <Boton variante="texto" compacto className="-ml-4 self-start" onClick={onCancelar}>
+        Dejarlo en la misma persona
+      </Boton>
+    </div>
   )
 }
