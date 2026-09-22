@@ -11,7 +11,6 @@ import { DIAS_ATRAS_PERMITIDOS, fechaLarga, hora, hoyBogota, nombreDelDia } from
 import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
-import { hayMicrofono } from '../lib/voz'
 import type { Departamento, Perfil, Persona, Saldo } from '../lib/tipos'
 import { DetallePersona } from './DetallePersona'
 
@@ -56,7 +55,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   const [departamentos, setDepartamentos] = useState<Departamento[] | null>(null)
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [personas, setPersonas] = useState<Persona[]>([])
-  const [texto, setTexto] = useState('')
   const [borrador, setBorrador] = useState<Borrador | null>(null)
   const [porAnular, setPorAnular] = useState<CompraDelDia | null>(null)
   // Al tocar una compra del día se ve todo lo de esa persona, en lugar de Registrar.
@@ -65,10 +63,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   // Con el día al que pertenecen: al cambiar de día no se muestran las del anterior.
   const [comprasCargadas, setComprasCargadas] = useState<{ dia: string; lista: CompraDelDia[] } | null>(null)
   const { aviso, mostrar, cerrar } = useAviso()
-  const entrada = useRef<HTMLInputElement>(null)
-  // Se registra hablando: escribir queda escondido, salvo si no hay micrófono.
-  const conMicrofono = hayMicrofono()
-  const [escribir, setEscribir] = useState(!conMicrofono)
   const puedeAnular = perfil.rol === 'admin' || perfil.rol === 'operador'
   // La cocina solo registra lo de hoy; la base tampoco se lo permite.
   const puedeCambiarDia = puedeAnular
@@ -133,11 +127,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     window.scrollTo(0, hayAbierta ? 0 : posicionDeRegistrar.current)
   }, [hayAbierta])
 
-  function alEnviar(e: FormEvent) {
-    e.preventDefault()
-    leer(texto)
-  }
-
   function leer(texto: string) {
     const frase = texto.trim()
     if (!frase || !departamentos) return
@@ -151,7 +140,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
       const ultima = compras?.find((c) => !c.anulada)
       if (ultima) setPorAnular(ultima)
       else mostrar({ tipo: 'error', texto: `No hay compras para anular${sufijoDelDia(dia, hoy) || ' hoy'}.` })
-      setTexto('')
       return
     }
 
@@ -164,7 +152,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
         cambiarDia(fecha)
         mostrar({ tipo: 'ok', texto: `Ahora se anotan las compras de${fecha === hoy ? ' hoy' : `l ${fechaLarga(fecha)}`}.` })
       }
-      setTexto('')
       return
     }
 
@@ -194,11 +181,6 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
       valor: '',
       fecha: dia,
     })
-  }
-
-  function cancelar() {
-    setBorrador(null)
-    entrada.current?.focus()
   }
 
   async function guardar(b: Borrador) {
@@ -236,10 +218,8 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     // Si se dictó "ayer" o "el martes", lo que sigue suele ser del mismo día.
     if (b.fecha !== dia) cambiarDia(b.fecha)
     setBorrador(null)
-    setTexto('')
     cargarPersonas()
     if (b.fecha === dia) cargarCompras()
-    entrada.current?.focus()
   }
 
   /** Crea la persona; si ya existía con ese nombre en el departamento, usa esa. */
@@ -359,64 +339,24 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
             personas={personas}
             onCambiar={setBorrador}
             onGuardar={guardar}
-            onCancelar={cancelar}
+            onCancelar={() => setBorrador(null)}
           />
         ) : (
-          <form onSubmit={alEnviar} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             {/* Solo en la pestaña visible, para que el micrófono no quede encendido. */}
             {activa && (
               <Microfono
                 vocabulario={() => vocabulario(personas, departamentos)}
-                onTexto={(dicho) => {
-                  setTexto(dicho)
-                  leer(dicho)
-                }}
-                onError={(mensaje) => {
-                  mostrar({ tipo: 'error', texto: mensaje })
-                  // Si la voz falla, escribir queda a la mano.
-                  setEscribir(true)
-                }}
+                onTexto={leer}
+                onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
                 onEmpezar={cerrar}
               />
             )}
-            {escribir ? (
-              <>
-                <label htmlFor="frase" className="pt-1 text-base text-tinta-suave">
-                  {conMicrofono ? 'O escríbelo. ' : ''}Por ejemplo: Juan TDH 10 mil
-                </label>
-                <div className="flex gap-3">
-                  <input
-                    id="frase"
-                    ref={entrada}
-                    value={texto}
-                    onChange={(e) => setTexto(e.target.value)}
-                    autoComplete="off"
-                    enterKeyHint="go"
-                    className={`${campo} flex-1`}
-                  />
-                  <Boton type="submit" disabled={!texto.trim()}>
-                    Seguir
-                  </Boton>
-                </div>
-                {/* Escondido como escribir: sin dictar ni frase, eligiendo quién y cuánto. */}
-                <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarAMano}>
-                  Anotar a mano
-                </Boton>
-              </>
-            ) : (
-              <Boton
-                variante="texto"
-                compacto
-                className="-ml-4 self-start"
-                onClick={() => {
-                  setEscribir(true)
-                  setTimeout(() => entrada.current?.focus())
-                }}
-              >
-                Prefiero escribirlo
-              </Boton>
-            )}
-          </form>
+            {/* Sin dictar: se elige quién y se pone cuánto. También si la voz falla o no hay micrófono. */}
+            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarAMano}>
+              Anotar a mano
+            </Boton>
+          </div>
         )}
       </div>
 
