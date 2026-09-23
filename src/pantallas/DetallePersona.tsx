@@ -256,7 +256,12 @@ export function DetallePersona({
     const { error } = await supabase.rpc('unir_personas', { origen: s.persona_id, destino: destino.id })
     setUniendoAhora(false)
     if (error) {
-      mostrar({ tipo: 'error', texto: 'No se pudo unir. Revisa el internet e intenta otra vez.' })
+      mostrar({
+        tipo: 'error',
+        texto: error.message.includes('archivada')
+          ? 'No se pudo unir: una de las dos ya está archivada. Quizás ya se unieron.'
+          : 'No se pudo unir. Revisa el internet e intenta otra vez.',
+      })
       return
     }
     setUniendo(null)
@@ -301,7 +306,10 @@ export function DetallePersona({
                   </svg>
                 </button>
               </div>
-              <p className="text-lg text-tinta-suave">{s.departamento}</p>
+              <p className="text-lg text-tinta-suave">
+                {s.departamento}
+                {!s.activo && ' · Archivada'}
+              </p>
             </div>
           )}
           {enPanel && !renombrando && (
@@ -410,7 +418,8 @@ export function DetallePersona({
         </>
       )}
 
-      {uniendo === null ? (
+      {/* Una archivada ya no se une: se unió antes o ya no compra. */}
+      {!s.activo ? null : uniendo === null ? (
         <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setUniendo('buscar')}>
           ¿Está repetida? Unir con otra persona
         </Boton>
