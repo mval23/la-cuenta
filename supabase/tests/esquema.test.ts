@@ -291,3 +291,55 @@ describe('documentos', () => {
     })
   })
 })
+
+describe('unir personas', () => {
+  let raybin: number
+  let reibi: number
+
+  it('pasa compras y pagos a la otra persona, conserva quién y cuándo, y archiva la repetida', async () => {
+    await como(OPERADOR, async () => {
+      const [d] = await filas(`insert into departamentos (nombre) values ('Sistemas') returning id`)
+      ;[raybin, reibi] = (
+        await filas(`insert into personas (nombre, departamento_id) values ('Raybin', ${d.id}), ('Reibi', ${d.id}) returning id`)
+      ).map((p) => p.id as number)
+      await db.query(`insert into compras (persona_id, valor_pesos, descripcion, fecha) values
+        (${raybin}, 4000, null, public.hoy_bogota()),
+        (${reibi}, 10000, 'almuerzo', public.hoy_bogota() - 1),
+        (${reibi}, 7000, null, public.hoy_bogota())`)
+      await db.query(`update compras set anulada = true where persona_id = ${reibi} and valor_pesos = 7000`)
+      await db.query(`insert into pagos (persona_id, valor_pesos, tipo) values (${reibi}, 3000, 'abono')`)
+
+      await db.query(`select unir_personas(${reibi}, ${raybin})`)
+
+      const saldo = await filas(`select persona_id, saldo, activo from saldos where persona_id in (${raybin}, ${reibi})`)
+      expect(saldo.find((s) => s.persona_id === raybin)).toMatchObject({ activo: true })
+      expect(Number(saldo.find((s) => s.persona_id === raybin)!.saldo)).toBe(4000 + 10000 - 3000)
+      expect(saldo.find((s) => s.persona_id === reibi)).toMatchObject({ activo: false })
+      expect(Number(saldo.find((s) => s.persona_id === reibi)!.saldo)).toBe(0)
+
+      const [pasada] = await filas(`select descripcion, fecha = public.hoy_bogota() - 1 as ayer, creada_por
+                                    from compras where persona_id = ${raybin} and valor_pesos = 10000`)
+      expect(pasada).toEqual({ descripcion: 'almuerzo', ayer: true, creada_por: OPERADOR })
+      const motivos = await filas(`select anulada_motivo from compras where persona_id = ${reibi} order by valor_pesos`)
+      // La anulada antes queda como estaba; la otra se anula como corregida.
+      expect(motivos.map((m) => m.anulada_motivo)).toEqual([null, 'corregida'])
+    })
+  })
+
+  it('no une a una persona consigo misma ni con una archivada', async () => {
+    await como(OPERADOR, async () => {
+      await expect(db.query(`select unir_personas(${raybin}, ${raybin})`)).rejects.toThrow()
+      await expect(db.query(`select unir_personas(${raybin}, ${reibi})`)).rejects.toThrow()
+    })
+  })
+
+  it('la cocina y quien no tiene perfil no pueden unir', async () => {
+    const [p] = await filas(`insert into personas (nombre, departamento_id)
+                             select 'Rabin', departamento_id from personas where id = ${raybin} returning id`)
+    for (const uid of [COCINA, SIN_PERFIL]) {
+      await como(uid, async () => {
+        await expect(db.query(`select unir_personas(${p.id}, ${raybin})`)).rejects.toThrow()
+      })
+    }
+  })
+})

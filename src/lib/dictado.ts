@@ -7,7 +7,7 @@
 // entre el nombre de una persona nueva y lo que compró.
 
 import { diaDeLaSemana, diasEntre, DIAS_ATRAS_PERMITIDOS, hoyBogota, sumarDias } from './fechas'
-import { normalizarNombre } from './personas'
+import { distancia, normalizarNombre, suenanIgual, suenanParecido } from './personas'
 import type { Persona } from './tipos'
 
 export interface DepartamentoDictado {
@@ -67,19 +67,6 @@ function separar(texto: string): Palabra[] {
       .filter((p) => p !== '')
       .map((original) => ({ original, norma: normalizar(original) }))
   )
-}
-
-/** Distancia de edición, para "Pruebas" = "Prueba" o un departamento mal oído. */
-function distancia(a: string, b: string): number {
-  let previa = Array.from({ length: b.length + 1 }, (_, j) => j)
-  for (let i = 1; i <= a.length; i++) {
-    const actual = [i]
-    for (let j = 1; j <= b.length; j++) {
-      actual[j] = Math.min(previa[j] + 1, actual[j - 1] + 1, previa[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
-    }
-    previa = actual
-  }
-  return previa[b.length]
 }
 
 // Palabras que no son ni nombre ni lo que se compró ---------------------------
@@ -376,8 +363,15 @@ interface Encontradas {
   posiciones: number[]
 }
 
-/** Busca en la frase el nombre (o el comienzo del nombre) de personas conocidas. */
-function buscarConocidas(frase: Frase, personas: Persona[]): Encontradas | null {
+/**
+ * Busca en la frase el nombre (o el comienzo del nombre) de personas conocidas.
+ * `igual` dice si una palabra dicha es una palabra del nombre.
+ */
+function buscarConocidas(
+  frase: Frase,
+  personas: Persona[],
+  igual: (dicha: string, delNombre: string) => boolean,
+): Encontradas | null {
   const libres = frase.libres()
   const dichas = libres.map((i) => normalizarNombre(frase.palabras[i].original))
   let mejor = 0
@@ -387,7 +381,13 @@ function buscarConocidas(frase: Frase, personas: Persona[]): Encontradas | null 
     const nombre = normalizarNombre(persona.nombre).split(' ').filter(Boolean)
     for (let inicio = 0; inicio < dichas.length; inicio++) {
       let largo = 0
-      while (largo < nombre.length && dichas[inicio + largo] === nombre[largo]) largo++
+      while (
+        largo < nombre.length &&
+        inicio + largo < dichas.length &&
+        igual(dichas[inicio + largo], nombre[largo])
+      ) {
+        largo++
+      }
       if (largo === 0 || largo < mejor) continue
       const completa = largo === nombre.length
       if (largo > mejor) {
@@ -418,11 +418,14 @@ function leerPersona(
   // Primero en el departamento dicho; si ahí no hay nadie parecido, puede que
   // la persona se haya cambiado de departamento: se busca en todos.
   const grupos = departamentoId === null ? [activas] : [activas.filter((p) => p.departamento_id === departamentoId), activas]
+  const orden = (a: Persona, b: Persona) => a.nombre.localeCompare(b.nombre, 'es')
+  // Lo que suena igual cuenta como el mismo nombre: la voz no distingue
+  // "Ferney" de "Fernay", así que si existen los dos, se pregunta.
+  const mismoNombre = (dicha: string, delNombre: string) => dicha === delNombre || suenanIgual(dicha, delNombre)
   for (const grupo of grupos) {
-    const encontradas = buscarConocidas(frase, grupo)
+    const encontradas = buscarConocidas(frase, grupo, mismoNombre)
     if (!encontradas) continue
     const { candidatas, completas, posiciones } = encontradas
-    const orden = (a: Persona, b: Persona) => a.nombre.localeCompare(b.nombre, 'es')
 
     // Encontrada en otro departamento del que se dijo: mejor preguntar.
     const otroDepartamento = departamentoId !== null && grupo === activas
@@ -442,6 +445,13 @@ function leerPersona(
     // Si hay que preguntar, las palabras se dejan: pueden ser el nombre de alguien nuevo.
     if (persona) frase.usar(posiciones, new Set(['a', 'para', 'al']))
     return { persona, candidatas: persona ? [] : [...candidatas].sort(orden) }
+  }
+  // Nadie con ese nombre: antes de crear a alguien nuevo se ofrecen las que
+  // suenan parecido ("Reibi" por Raybin). Nunca se eligen solas.
+  const parecido = (dicha: string, delNombre: string) => puedeSerNombre(dicha) && suenanParecido(dicha, delNombre)
+  for (const grupo of grupos) {
+    const encontradas = buscarConocidas(frase, grupo, parecido)
+    if (encontradas) return { persona: null, candidatas: [...encontradas.candidatas].sort(orden) }
   }
   return null
 }

@@ -338,3 +338,48 @@ describe('día', () => {
     expect(leer('el domingo Juan TDH 10')).toMatchObject({ nombre: 'Juan', fecha: '2026-09-13' })
   })
 })
+
+describe('persona que suena parecido (la voz la escribe distinto)', () => {
+  const SISTEMAS = 6
+  const gente: Persona[] = [
+    ...personas,
+    { id: 20, nombre: 'Raybin', departamento_id: SISTEMAS, activo: true },
+    { id: 21, nombre: 'Ferney', departamento_id: SISTEMAS, activo: true },
+    { id: 22, nombre: 'Óscar', departamento_id: SISTEMAS, activo: true },
+  ]
+
+  it('ofrece a la que ya existe en vez de crear una nueva', () => {
+    const r = leer('Reibi 10', gente)
+    expect(r.persona).toBeNull()
+    expect(ids(r.candidatas)).toEqual([20])
+    // Si de verdad es alguien nuevo, se puede crear con lo que se dijo.
+    expect(r.nombre).toBe('Reibi')
+    expect(r.valor).toBe(10000)
+  })
+
+  it('lo que suena igual se toma como el mismo nombre', () => {
+    expect(leer('Fernay 12', gente)).toMatchObject({ persona: { id: 21 }, valor: 12000 })
+    expect(leer('Ferney 12', gente).persona?.id).toBe(21)
+  })
+
+  it('si dos personas suenan igual, pregunta cuál', () => {
+    const conDos = [...gente, { id: 23, nombre: 'Fernay', departamento_id: SISTEMAS, activo: true }]
+    const r = leer('Ferney 12', conDos)
+    expect(r.persona).toBeNull()
+    expect(ids(r.candidatas)).toEqual([23, 21])
+  })
+
+  it('no confunde lo que compró con un nombre', () => {
+    const conTito = [...personas, { id: 24, nombre: 'Tito', departamento_id: TDH, activo: true }]
+    const r = leer('Camilo un tinto 2', conTito)
+    expect(r.candidatas).toEqual([])
+    expect(r.nombre).toBe('Camilo')
+  })
+
+  it('si nada suena parecido, es una persona nueva', () => {
+    const r = leer('Fabián 9', gente)
+    expect(r.persona).toBeNull()
+    expect(r.candidatas).toEqual([])
+    expect(r.nombre).toBe('Fabián')
+  })
+})

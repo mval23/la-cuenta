@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
+import { Parecidas } from '../componentes/Parecidas'
 import type { DatosAviso } from '../componentes/useAviso'
 import { normalizarNombre } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
@@ -113,7 +114,13 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
           Primero hay que crear un departamento, en Ajustes &gt; Departamentos.
         </p>
       ) : (
-        <AgregarPersona departamentos={activos} mostrar={mostrar} onAgregada={cargar} />
+        <AgregarPersona
+          departamentos={activos}
+          personas={activas}
+          nombreDepto={nombreDepto}
+          mostrar={mostrar}
+          onAgregada={cargar}
+        />
       )}
 
       {activas.length > 0 && (
@@ -198,10 +205,15 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
 
 function AgregarPersona({
   departamentos,
+  personas,
+  nombreDepto,
   mostrar,
   onAgregada,
 }: {
   departamentos: Departamento[]
+  /** Las activas, para avisar si ya hay alguien que suena parecido. */
+  personas: Persona[]
+  nombreDepto: (id: number) => string
   mostrar: (aviso: DatosAviso) => void
   onAgregada: () => Promise<void>
 }) {
@@ -254,6 +266,7 @@ function AgregarPersona({
           ))}
         </select>
       </div>
+      <Parecidas nombre={nombre} personas={personas} nombreDepto={nombreDepto} />
       <Boton type="submit" className="self-end" disabled={!listo || guardando}>
         {guardando ? 'Agregando...' : 'Agregar'}
       </Boton>

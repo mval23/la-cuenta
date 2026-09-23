@@ -5,7 +5,7 @@ import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
 import { hoyBogota } from '../lib/fechas'
-import { normalizarNombre } from '../lib/personas'
+import { normalizarNombre, suenanParecido } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Saldo } from '../lib/tipos'
@@ -77,6 +77,7 @@ export function DetallePersona({
   volverA = 'Cobrar',
   onVolver,
   onCambio,
+  onUnida,
   mostrar,
 }: {
   saldo: Saldo
@@ -86,12 +87,18 @@ export function DetallePersona({
   volverA?: string
   onVolver: () => void
   onCambio: () => Promise<void>
+  /** Tras unirla con otra persona (que queda archivada): abrir la otra. */
+  onUnida: (personaId: number) => Promise<void>
   mostrar: (aviso: DatosAviso) => void
 }) {
   const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null)
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [editando, setEditando] = useState<string | null>(null)
+  const [renombrando, setRenombrando] = useState(false)
+  // Unir con otra persona: primero se busca con quién, después se confirma.
+  const [uniendo, setUniendo] = useState<'buscar' | Quien | null>(null)
+  const [uniendoAhora, setUniendoAhora] = useState(false)
 
   const cargar = useCallback(async () => {
     const desde = new Date(Date.now() - DIAS_DE_HISTORIAL * 86_400_000).toISOString().slice(0, 10)
@@ -226,6 +233,37 @@ export function DetallePersona({
     return true
   }
 
+  async function renombrar(nombre: string): Promise<boolean> {
+    const { error } = await supabase.from('personas').update({ nombre }).eq('id', s.persona_id)
+    if (error) {
+      mostrar({
+        tipo: 'error',
+        texto:
+          error.code === '23505'
+            ? `Ya hay una persona llamada ${nombre} en ${s.departamento}.`
+            : 'No se pudo cambiar el nombre. Revisa el internet e intenta otra vez.',
+      })
+      return false
+    }
+    await onCambio()
+    setRenombrando(false)
+    mostrar({ tipo: 'ok', texto: `Se cambió el nombre: ahora es ${nombre}.` })
+    return true
+  }
+
+  async function unir(destino: Quien) {
+    setUniendoAhora(true)
+    const { error } = await supabase.rpc('unir_personas', { origen: s.persona_id, destino: destino.id })
+    setUniendoAhora(false)
+    if (error) {
+      mostrar({ tipo: 'error', texto: 'No se pudo unir. Revisa el internet e intenta otra vez.' })
+      return
+    }
+    setUniendo(null)
+    mostrar({ tipo: 'ok', texto: `Se unió ${s.nombre} con ${destino.nombre}. Ahora todo está en ${destino.nombre}.` })
+    await onUnida(destino.id)
+  }
+
   const aFavor = s.saldo < 0
   const Titulo = enPanel ? 'h2' : 'h1'
 
@@ -241,12 +279,32 @@ export function DetallePersona({
       <div
         className={`flex justify-between gap-x-4 gap-y-2 ${enPanel ? 'flex-col' : 'flex-wrap items-end'}`}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <Titulo className="text-titulo font-bold">{s.nombre}</Titulo>
-            <p className="text-lg text-tinta-suave">{s.departamento}</p>
-          </div>
-          {enPanel && (
+        <div className={`flex items-start justify-between gap-4 ${renombrando ? 'w-full' : ''}`}>
+          {renombrando ? (
+            <CambiarNombre nombre={s.nombre} onCancelar={() => setRenombrando(false)} onGuardar={renombrar} />
+          ) : (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <Titulo className="min-w-0 text-titulo font-bold">{s.nombre}</Titulo>
+                <button
+                  type="button"
+                  onClick={() => setRenombrando(true)}
+                  aria-label={`Cambiar el nombre de ${s.nombre}`}
+                  className="flex size-12 shrink-0 items-center justify-center rounded-xl text-marca active:bg-hundido"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    className="size-6 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"
+                  >
+                    <path d="M21.2 6.8a1 1 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8l-1.3 4.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-lg text-tinta-suave">{s.departamento}</p>
+            </div>
+          )}
+          {enPanel && !renombrando && (
             <Boton variante="texto" compacto className="-mr-3" onClick={onVolver}>
               Cerrar
             </Boton>
@@ -351,7 +409,91 @@ export function DetallePersona({
           </ul>
         </>
       )}
+
+      {uniendo === null ? (
+        <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setUniendo('buscar')}>
+          ¿Está repetida? Unir con otra persona
+        </Boton>
+      ) : uniendo === 'buscar' ? (
+        <div className="flex flex-col gap-3 rounded-xl bg-hundido p-4">
+          <p className="text-lg font-semibold">¿Con quién se une {s.nombre}?</p>
+          <BuscarPersona
+            excluir={s.persona_id}
+            sugerirPara={s.nombre}
+            textoCancelar="Cancelar"
+            onElegir={setUniendo}
+            onCancelar={() => setUniendo(null)}
+          />
+        </div>
+      ) : (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl bg-aviso-suave p-4">
+          <p className="text-xl font-semibold">
+            ¿Unir a {s.nombre} con {uniendo.nombre} · {uniendo.departamento}?
+          </p>
+          <p className="text-lg">
+            Todo lo de {s.nombre}
+            {s.saldo !== 0 && ` (${aFavor ? 'a favor' : 'debe'} ${formatearPesos(Math.abs(s.saldo))})`} pasa a{' '}
+            {uniendo.nombre}, y {s.nombre} se archiva. No se puede deshacer.
+          </p>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Boton variante="secundario" compacto onClick={() => setUniendo(null)} disabled={uniendoAhora}>
+              No
+            </Boton>
+            <Boton compacto onClick={() => unir(uniendo)} disabled={uniendoAhora}>
+              {uniendoAhora ? 'Uniendo...' : 'Sí, unir'}
+            </Boton>
+          </div>
+        </div>
+      )}
     </section>
+  )
+}
+
+function CambiarNombre({
+  nombre: actual,
+  onCancelar,
+  onGuardar,
+}: {
+  nombre: string
+  onCancelar: () => void
+  onGuardar: (nombre: string) => Promise<boolean>
+}) {
+  const [nombre, setNombre] = useState(actual)
+  const [guardando, setGuardando] = useState(false)
+  const limpio = nombre.trim().replace(/\s+/g, ' ')
+  const listo = limpio !== '' && limpio !== actual
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault()
+    if (!listo || guardando) return
+    setGuardando(true)
+    // Si salió bien, este formulario se cierra solo.
+    if (!(await onGuardar(limpio))) setGuardando(false)
+  }
+
+  return (
+    <form onSubmit={guardar} className="flex w-full flex-col gap-3">
+      <label className="flex flex-col gap-2">
+        <span className="text-base font-semibold text-tinta-suave">Nombre</span>
+        <input
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          autoComplete="off"
+          autoCapitalize="words"
+          autoFocus
+          enterKeyHint="done"
+          className={`${campo} text-xl`}
+        />
+      </label>
+      <div className="flex flex-wrap justify-end gap-3">
+        <Boton variante="secundario" compacto onClick={onCancelar}>
+          Cancelar
+        </Boton>
+        <Boton type="submit" compacto className="min-w-32" disabled={!listo || guardando}>
+          {guardando ? 'Guardando...' : 'Guardar'}
+        </Boton>
+      </div>
+    </form>
   )
 }
 
@@ -461,7 +603,21 @@ function Editar({
 }
 
 /** Buscar a quién pasarle una compra o un pago: por nombre, o nombre y departamento. */
-function BuscarPersona({ onElegir, onCancelar }: { onElegir: (q: Quien) => void; onCancelar: () => void }) {
+function BuscarPersona({
+  excluir,
+  sugerirPara,
+  textoCancelar = 'Dejarlo en la misma persona',
+  onElegir,
+  onCancelar,
+}: {
+  /** La persona que no se ofrece: con quien se está. */
+  excluir?: number
+  /** Sin escribir nada, se ofrecen las que suenan como este nombre. */
+  sugerirPara?: string
+  textoCancelar?: string
+  onElegir: (q: Quien) => void
+  onCancelar: () => void
+}) {
   const [personas, setPersonas] = useState<Quien[] | null>(null)
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [busqueda, setBusqueda] = useState('')
@@ -495,11 +651,31 @@ function BuscarPersona({ onElegir, onCancelar }: { onElegir: (q: Quien) => void;
       ? []
       : personas
           .filter((p) => {
+            if (p.id === excluir) return false
             const donde = normalizarNombre(`${p.nombre} ${p.departamento}`)
             return palabras.every((palabra) => donde.includes(palabra))
           })
           .sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
   const MAXIMO = 8
+  const primerNombre = (nombre: string) => normalizarNombre(nombre).split(' ')[0] ?? ''
+  const sugeridas =
+    personas === null || !sugerirPara
+      ? []
+      : personas
+          .filter((p) => p.id !== excluir && suenanParecido(primerNombre(sugerirPara), primerNombre(p.nombre)))
+          .sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
+
+  const boton = (p: Quien) => (
+    <button
+      key={p.id}
+      type="button"
+      onClick={() => onElegir(p)}
+      className="min-h-14 rounded-xl border border-control bg-superficie px-4 text-left text-xl active:bg-hundido"
+    >
+      <span className="font-semibold">{p.nombre}</span>{' '}
+      <span className="font-semibold text-tinta-suave">· {p.departamento}</span>
+    </button>
+  )
 
   return (
     <div className="flex flex-col gap-2">
@@ -517,23 +693,19 @@ function BuscarPersona({ onElegir, onCancelar }: { onElegir: (q: Quien) => void;
         <ErrorDeCarga texto="No se pudo cargar las personas." onReintentar={cargar} />
       ) : personas === null ? (
         <p className="text-base text-tinta-suave">Cargando...</p>
+      ) : palabras.length === 0 && sugeridas.length > 0 ? (
+        <>
+          <p className="text-base text-tinta-suave">Suenan parecido:</p>
+          {sugeridas.slice(0, MAXIMO).map(boton)}
+          <p className="text-base text-tinta-suave">¿No es ninguna? Escribe el nombre.</p>
+        </>
       ) : palabras.length === 0 ? (
         <p className="text-base text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
       ) : encontradas.length === 0 ? (
         <p className="text-base text-tinta-suave">No hay nadie con ese nombre.</p>
       ) : (
         <>
-          {encontradas.slice(0, MAXIMO).map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onElegir(p)}
-              className="min-h-14 rounded-xl border border-control bg-superficie px-4 text-left text-xl active:bg-hundido"
-            >
-              <span className="font-semibold">{p.nombre}</span>{' '}
-              <span className="font-semibold text-tinta-suave">· {p.departamento}</span>
-            </button>
-          ))}
+          {encontradas.slice(0, MAXIMO).map(boton)}
           {encontradas.length > MAXIMO && (
             <p className="text-base text-tinta-suave">
               Hay {encontradas.length - MAXIMO} más. Escribe más del nombre o el departamento.
@@ -542,7 +714,7 @@ function BuscarPersona({ onElegir, onCancelar }: { onElegir: (q: Quien) => void;
         </>
       )}
       <Boton variante="texto" compacto className="-ml-4 self-start" onClick={onCancelar}>
-        Dejarlo en la misma persona
+        {textoCancelar}
       </Boton>
     </div>
   )
