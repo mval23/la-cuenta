@@ -15,10 +15,37 @@ export function normalizarNombre(texto: string): string {
     .trim()
 }
 
-/** Nombres y departamentos que el reconocimiento de voz debe esperar oír. */
-export function vocabulario(personas: Persona[], departamentos: { nombre: string }[]): string {
-  const nombres = new Set(personas.filter((p) => p.activo).map((p) => p.nombre.trim()))
-  return [...departamentos.map((d) => d.nombre.trim()), ...nombres].join(', ')
+/**
+ * Nombres y departamentos que el reconocimiento de voz debe esperar oír.
+ *
+ * Al servidor solo le caben unos 600 caracteres (Whisper no lee más), y con
+ * más de cien personas no caben todas. Por eso van primero los primeros
+ * nombres sin repetir, empezando por los de quienes más compran (`compras`:
+ * cuántas compras recientes tiene cada persona), y al final los nombres
+ * completos: lo que más importa es que escriba bien "Yesid", no el apellido.
+ */
+export function vocabulario(
+  personas: Persona[],
+  departamentos: { nombre: string }[],
+  compras: ReadonlyMap<number, number> = new Map(),
+): string {
+  const activas = personas
+    .filter((p) => p.activo)
+    // sort es estable: con las mismas compras se conserva el orden de la lista.
+    .sort((a, b) => (compras.get(b.id) ?? 0) - (compras.get(a.id) ?? 0))
+  const vistos = new Set<string>()
+  const lista: string[] = []
+  const agregar = (texto: string) => {
+    const clave = normalizarNombre(texto)
+    if (clave && !vistos.has(clave)) {
+      vistos.add(clave)
+      lista.push(texto)
+    }
+  }
+  departamentos.forEach((d) => agregar(d.nombre.trim()))
+  activas.forEach((p) => agregar(p.nombre.trim().split(/\s+/)[0]))
+  activas.forEach((p) => agregar(p.nombre.trim().replace(/\s+/g, ' ')))
+  return lista.join(', ')
 }
 
 // Lo que se dice antes del nombre: "Agrega a...", "Se llama...".
@@ -53,13 +80,53 @@ export function nombreDictado(texto: string): string {
 // "Fernay" por Ferney. Antes de crear a alguien nuevo se busca por cómo suena.
 
 /**
- * Cómo suena una palabra en español, para comparar: "Raybin" y "Reibin" dan
- * lo mismo, igual que "Ferney" y "Fernay", "Yohan" y "Johan" no.
+ * Nombres de origen inglés que el reconocimiento de voz escribe en inglés
+ * ("Steven") pero que aquí se dicen en español ("Estiven"). Se comparan por
+ * cómo se dicen en Colombia, no por cómo se escriben en inglés.
+ */
+const COMO_SE_DICE: Record<string, string> = {
+  steven: 'estiven', stephen: 'estiven', steve: 'estiv',
+  stephanie: 'estefani', stefanie: 'estefani', stephany: 'estefani',
+  jason: 'yeison', jayson: 'yeison', jaison: 'yeison', jeison: 'yeison',
+  brian: 'brayan', bryan: 'brayan',
+  michael: 'maicol', maycol: 'maicol', maikol: 'maicol',
+  jennifer: 'yenifer', jenifer: 'yenifer', jeniffer: 'yenifer',
+  jefferson: 'yeferson', jeferson: 'yeferson',
+  jeffrey: 'yefri', jefry: 'yefri', jeffry: 'yefri',
+  john: 'yon', jhon: 'yon',
+  johan: 'yoan', jhoan: 'yoan', johann: 'yoan',
+  johana: 'yoana', johanna: 'yoana', jhoana: 'yoana',
+  jonathan: 'yonatan', jhonatan: 'yonatan', jhonathan: 'yonatan', jonatan: 'yonatan',
+  jessica: 'yesica', jesica: 'yesica',
+  jessy: 'yesi', jessie: 'yesi', jessi: 'yesi', jesy: 'yesi',
+  lady: 'leidi',
+  ivette: 'ibeth', ivett: 'ibeth', ivet: 'ibeth', ivete: 'ibeth',
+  allan: 'alan',
+  gina: 'yina',
+  joana: 'yoana',
+  dylan: 'dilan',
+  shirley: 'sirli',
+  sharon: 'saron',
+  nicole: 'nicol',
+  michelle: 'michel',
+}
+
+/**
+ * Cómo suena un nombre en español, para comparar: "Raybin" y "Reibin" dan lo
+ * mismo, igual que "Ferney" y "Fernay" o "Steven" y "Estiven".
  */
 export function sonido(palabra: string): string {
   return (
     normalizarNombre(palabra)
+      .split(' ')
+      .map((p) => COMO_SE_DICE[p] ?? p)
+      .join('')
       .replace(/[^a-z]/g, '')
+      // En español se dice con "e" lo que empieza con "s" y consonante:
+      // "Estiven" por Stiven, "Estefany" por Stefany, "Esneider" por Sneider.
+      .replace(/^es(?=[^aeiou])/, 's')
+      // "Christian" se dice con k.
+      .replace(/ch(?=[rl])/g, 'k')
       .replace(/(ch|sh)/g, 'C')
       .replace(/ph/g, 'f')
       .replace(/th/g, 't')
@@ -76,12 +143,17 @@ export function sonido(palabra: string): string {
       .replace(/h/g, '')
       .replace(/v/g, 'b')
       .replace(/w/g, 'u')
-      // La "y" que no va antes de vocal suena "i": "Raybin", "Ferney".
-      .replace(/y(?![aeiou])/g, 'i')
+      // La "y" suena "i" menos al comienzo: "Raybin", "Ferney", "Dayana" y "Daiana".
+      .replace(/(?<=.)y/g, 'i')
       // "ai", "ei" y "e" se confunden al oído: "Fernay" y "Ferney"; y los
       // nombres en inglés se escriben de mil formas: "Jaison" y "Jason".
-      .replace(/[ae]i/g, 'e')
+      // Antes de otra vocal no: "Daiana".
+      .replace(/[ae]i(?![aeiou])/g, 'e')
       .replace(/(.)\1+/g, '$1')
+      // "Katherine" se dice "Katerin".
+      .replace(/ine$/, 'in')
+      // La "d" o la "t" final casi no se dicen: "Yesid" suena "Yesí", "Enith" y "Enid".
+      .replace(/[dt]$/, '')
   )
 }
 

@@ -376,6 +376,31 @@ describe('persona que suena parecido (la voz la escribe distinto)', () => {
     expect(r.nombre).toBe('Camilo')
   })
 
+  it('con la "e" que se dice antes de la "s" también la encuentra', () => {
+    const conSteven = [...gente, { id: 25, nombre: 'Steven', departamento_id: SISTEMAS, activo: true }]
+    // Steven aquí se dice "Estiven": es la misma.
+    expect(leer('Estiven 10', conSteven).persona?.id).toBe(25)
+    const conStiven = [...gente, { id: 26, nombre: 'Stiven', departamento_id: SISTEMAS, activo: true }]
+    expect(leer('Estiven 10', conStiven).persona?.id).toBe(26)
+  })
+
+  it('los nombres que la voz escribe en inglés se leen como se dicen aquí', () => {
+    const conEstiven = [...gente, { id: 27, nombre: 'Estiven', departamento_id: SISTEMAS, activo: true }]
+    expect(leer('Steven 10', conEstiven).persona?.id).toBe(27)
+    const conMaicol = [...gente, { id: 28, nombre: 'Maicol', departamento_id: SISTEMAS, activo: true }]
+    expect(leer('Michael almuerzo 12', conMaicol)).toMatchObject({ persona: { id: 28 }, descripcion: 'almuerzo' })
+  })
+
+  it('"Jessy" es Yesid: así escribe la voz a Yesid', () => {
+    const conYesid = [
+      ...gente,
+      { id: 29, nombre: 'Yesid', departamento_id: SISTEMAS, activo: true },
+      { id: 30, nombre: 'Yesid Conductor', departamento_id: SISTEMAS, activo: true },
+    ]
+    expect(leer('Jessy 10', conYesid).persona?.id).toBe(29)
+    expect(leer('Jessy Conductor 10', conYesid).persona?.id).toBe(30)
+  })
+
   it('si nada suena parecido, es una persona nueva', () => {
     const r = leer('Fabián 9', gente)
     expect(r.persona).toBeNull()
