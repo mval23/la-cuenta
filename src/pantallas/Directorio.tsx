@@ -7,6 +7,7 @@ import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
+import { Parecidas } from '../componentes/Parecidas'
 import { useAviso, type DatosAviso } from '../componentes/useAviso'
 import { nombreDictado, normalizarNombre } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
@@ -146,6 +147,8 @@ export function Directorio({ activa }: { activa: boolean }) {
                     <AgregarPersona
                       departamento={d}
                       personas={personas.filter((p) => p.departamento_id === d.id)}
+                      todas={personas}
+                      nombreDepto={(id) => departamentos.find((x) => x.id === id)?.nombre ?? ''}
                       activa={activa}
                       mostrar={mostrar}
                       onAgregada={cargar}
@@ -192,6 +195,8 @@ export function Directorio({ activa }: { activa: boolean }) {
 function AgregarPersona({
   departamento,
   personas,
+  todas,
+  nombreDepto,
   activa,
   mostrar,
   onAgregada,
@@ -200,6 +205,9 @@ function AgregarPersona({
   departamento: Departamento
   /** Las del departamento, para que el dictado escriba bien los apellidos conocidos. */
   personas: Persona[]
+  /** Todas las activas, para avisar si ya hay alguien que suena parecido. */
+  todas: Persona[]
+  nombreDepto: (id: number) => string
   activa: boolean
   mostrar: (aviso: DatosAviso) => void
   onAgregada: () => Promise<void>
@@ -274,6 +282,7 @@ function AgregarPersona({
           Listo
         </Boton>
       </div>
+      <Parecidas nombre={nombre} personas={todas} nombreDepto={nombreDepto} />
     </form>
   )
 }

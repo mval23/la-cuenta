@@ -6,6 +6,7 @@ import { Calendario, ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
+import { Parecidas } from '../componentes/Parecidas'
 import { leerDictado } from '../lib/dictado'
 import { DIAS_ATRAS_PERMITIDOS, fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
 import { normalizarNombre, vocabulario } from '../lib/personas'
@@ -309,6 +310,10 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
           volverA="Registrar"
           onVolver={() => setAbierta(null)}
           onCambio={alCambiarDetalle}
+          onUnida={async (id) => {
+            const [saldo] = await Promise.all([cargarSaldo(id), cargarCompras(), cargarPersonas()])
+            setAbierta(saldo)
+          }}
           mostrar={mostrar}
         />
         <Aviso aviso={aviso} onCerrar={cerrar} />
@@ -625,6 +630,12 @@ function Confirmacion({
                 ))}
               </select>
             </div>
+            <Parecidas
+              nombre={b.nombreNuevo}
+              personas={personas}
+              nombreDepto={nombreDepto}
+              onElegir={(p) => cambiar({ personaId: p.id })}
+            />
             <Boton variante="texto" compacto className="-ml-4 self-start" onClick={buscarExistente}>
               Elegir una persona que ya existe
             </Boton>

@@ -140,6 +140,10 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
       enPanel={ancha}
       onVolver={() => setAbierta(null)}
       onCambio={cargar}
+      onUnida={async (id) => {
+        await cargar()
+        setAbierta(id)
+      }}
       mostrar={mostrar}
     />
   )
