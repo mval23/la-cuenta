@@ -39,6 +39,17 @@ describe('agruparParaCobro al buscar', () => {
     const grupos = agruparParaCobro(saldos, 'rosa')
     expect(grupos[0].personas.map((p) => [p.nombre, p.saldo])).toEqual([['Rosa', 0]])
   })
+
+  it('no muestra a las archivadas o unidas que no deben nada, ni al buscar', () => {
+    const conArchivadas = [
+      ...saldos,
+      { ...saldo(6, 'María Espinosa', 1, 'Bodega', 0), activo: false },
+      { ...saldo(7, 'María Pérez', 1, 'Bodega', 3000), activo: false },
+    ]
+    const grupos = agruparParaCobro(conArchivadas, 'maria')
+    // Si todavía debe, sigue apareciendo: hay que cobrarle.
+    expect(grupos.flatMap((g) => g.personas.map((p) => p.nombre))).toEqual(['María Pérez'])
+  })
 })
 
 describe('agruparParaCobro después de pagar', () => {

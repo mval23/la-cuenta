@@ -23,6 +23,9 @@ export function agruparParaCobro(
   const grupos = new Map<number, GrupoDeCobro>()
 
   for (const s of saldos) {
+    // Quien se archivó o se unió con otra persona y no debe nada ya no existe
+    // para el cobro, ni siquiera al buscar.
+    if (!s.activo && s.saldo === 0) continue
     // Al buscar se muestra también a quien está al día, para poder abrir su
     // historial y anular un pago equivocado. Quien acaba de pagar se queda
     // en su sitio para que la lista no salte bajo el dedo.
