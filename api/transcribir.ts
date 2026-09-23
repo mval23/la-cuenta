@@ -53,8 +53,13 @@ export async function POST(request: Request): Promise<Response> {
   envio.append('temperature', '0')
   envio.append('response_format', 'json')
   // Ejemplo de cómo suena un dictado más los nombres que puede oír, para que
-  // escriba "TDH" y no "te de hache", y los nombres con su ortografía.
-  envio.append('prompt', `Juan TDH almuerzo a 10 mil. Carlos 12. Ayer, Pedro 15. ${vocabulario}`)
+  // escriba "TDH" y no "te de hache", y los nombres con su ortografía. Los
+  // nombres de ejemplo van como se escriben en Colombia ("Estiven", no
+  // "Steven"), para que no los pase a ortografía en inglés.
+  envio.append(
+    'prompt',
+    `Juan TDH almuerzo a 10 mil. Carlos 12. Ayer, Estiven 15. Yeison 8. Maicol 5. ${vocabulario}`,
+  )
 
   const r = await fetch(GROQ_URL, {
     method: 'POST',

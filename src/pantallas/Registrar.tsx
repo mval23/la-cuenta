@@ -56,6 +56,8 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   const [departamentos, setDepartamentos] = useState<Departamento[] | null>(null)
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [personas, setPersonas] = useState<Persona[]>([])
+  // Cuántas compras recientes tiene cada persona: sus nombres van primero al reconocimiento de voz.
+  const [comprasRecientes, setComprasRecientes] = useState<ReadonlyMap<number, number>>(new Map())
   const [borrador, setBorrador] = useState<Borrador | null>(null)
   const [porAnular, setPorAnular] = useState<CompraDelDia | null>(null)
   // Al tocar una compra del día se ve todo lo de esa persona, en lugar de Registrar.
@@ -99,6 +101,15 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     if (data) setPersonas(data.map(({ id, nombre, departamento_id, activo }) => ({ id, nombre, departamento_id, activo })))
   }, [])
 
+  const cargarComprasRecientes = useCallback(async () => {
+    const desde = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
+    const { data } = await supabase.from('compras').select('persona_id').eq('anulada', false).gte('fecha', desde)
+    if (!data) return
+    const cuantas = new Map<number, number>()
+    for (const { persona_id } of data) cuantas.set(persona_id, (cuantas.get(persona_id) ?? 0) + 1)
+    setComprasRecientes(cuantas)
+  }, [])
+
   // Lo de las personas archivadas no aparece en la lista del día (ni cuenta en
   // su total, ni lo anula "bórrala"). Sigue en su historial, en Cobrar.
   const cargarCompras = useCallback(async () => {
@@ -118,7 +129,8 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
     if (!activa) return
     cargarDepartamentos()
     cargarPersonas()
-  }, [activa, cargarDepartamentos, cargarPersonas])
+    cargarComprasRecientes()
+  }, [activa, cargarDepartamentos, cargarPersonas, cargarComprasRecientes])
 
   useEffect(() => {
     if (activa) cargarCompras()
@@ -353,7 +365,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
             {/* Solo en la pestaña visible, para que el micrófono no quede encendido. */}
             {activa && (
               <Microfono
-                vocabulario={() => vocabulario(personas, departamentos)}
+                vocabulario={() => vocabulario(personas, departamentos, comprasRecientes)}
                 onTexto={leer}
                 onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
                 onEmpezar={cerrar}
