@@ -409,8 +409,13 @@ export function DetallePersona({
               const contenido = (
                 <>
                   <div className={`min-w-0 flex-1 ${m.anulado ? 'text-tinta-tenue line-through' : ''}`}>
-                    <p className={`text-lg ${esPago && !m.anulado ? 'font-semibold text-exito' : ''}`}>{m.texto}</p>
-                    <p className="text-base text-tinta-suave">{fechaCorta(m.fecha)}</p>
+                    {/* El día va primero y grande: así se busca en el historial. */}
+                    <p className="text-lg font-semibold">{fechaCorta(m.fecha)}</p>
+                    <p
+                      className={`text-base ${esPago && !m.anulado ? 'font-semibold text-exito' : m.anulado ? '' : 'text-tinta-suave'}`}
+                    >
+                      {m.texto}
+                    </p>
                   </div>
                   <span
                     className={`text-lg font-semibold tabular-nums ${
