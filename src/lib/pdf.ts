@@ -15,8 +15,6 @@ export interface Pdf {
 }
 
 // Colores de la paleta (src/index.css), en RGB para jsPDF.
-const MARCA: [number, number, number] = [29, 95, 168]
-const MARCA_SUAVE: [number, number, number] = [232, 240, 250]
 const TINTA: [number, number, number] = [27, 31, 36]
 const TINTA_SUAVE: [number, number, number] = [80, 88, 102]
 const LINEA: [number, number, number] = [150, 156, 166]
@@ -71,76 +69,72 @@ export async function pdfDeQuincena(filas: FilaDeQuincena[], q: Quincena, hoy: s
   const { jsPDF, autoTable } = await librerias()
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   const ancho = doc.internal.pageSize.width
+  const alto = doc.internal.pageSize.height
+  const centro = ancho / 2
   const grupos = agruparParaCobro(filas.map((f) => ({ ...f, activo: true })))
   const porFila = new Map(filas.map((f) => [f.persona_id, f]))
-  const porCobrar = filas.reduce((suma, f) => suma + Math.max(f.saldo, 0), 0)
-  const personas = grupos.reduce((suma, g) => suma + g.personas.length, 0)
 
   doc.setTextColor(...TINTA).setFont('helvetica', 'bold').setFontSize(18)
-  doc.text('Cuentas por cobrar', MARGEN, MARGEN + 4)
+  doc.text('Cuentas por cobrar', centro, MARGEN + 4, { align: 'center' })
   doc.setFont('helvetica', 'normal').setFontSize(12)
-  doc.text(`Quincena del ${nombreDeQuincena(q)}`, MARGEN, MARGEN + 11)
+  doc.text(`Quincena del ${nombreDeQuincena(q)}`, centro, MARGEN + 11, { align: 'center' })
   doc.setFontSize(10).setTextColor(...TINTA_SUAVE)
-  doc.text(`Hecho el ${fechaLarga(hoy)}`, ancho - MARGEN, MARGEN + 4, { align: 'right' })
-  doc.setFontSize(12).setTextColor(...TINTA)
-  doc.text(
-    `${personas} ${personas === 1 ? 'persona' : 'personas'} · Total por cobrar: ${formatearPesos(porCobrar)}`,
-    MARGEN,
-    MARGEN + 18,
-  )
+  doc.text(`Hecho el ${fechaLarga(hoy)}`, centro, MARGEN + 17, { align: 'center' })
+  doc.setTextColor(...TINTA)
 
-  const cuerpo: RowInput[] = []
-  for (const g of grupos) {
-    cuerpo.push([
-      {
-        content: `${g.departamento} · ${g.personas.length} ${g.personas.length === 1 ? 'persona' : 'personas'}`,
-        colSpan: 4,
-        styles: { fontStyle: 'bold', fillColor: MARCA_SUAVE, fontSize: 11.5 },
-      },
-      // Como el total general: lo que hay por cobrar, sin restar los saldos a favor.
-      { content: formatearPesos(g.personas.reduce((suma, s) => suma + Math.max(s.saldo, 0), 0)), styles: { fontStyle: 'bold', fillColor: MARCA_SUAVE, halign: 'right', fontSize: 11.5 } },
-    ])
-    for (const s of g.personas) {
-      const f = porFila.get(s.persona_id)!
-      cuerpo.push([
-        f.nombre,
-        saldoEnTabla(f.anterior),
-        f.comprado ? formatearPesos(f.comprado) : '',
-        f.pagado ? formatearPesos(f.pagado) : '',
-        { content: saldoEnTabla(f.saldo), styles: { fontStyle: 'bold' } },
-      ])
-    }
+  let y = MARGEN + 30
+  if (grupos.length === 0) {
+    doc.setFontSize(12).text('Nadie debe en esta quincena.', centro, y, { align: 'center' })
   }
 
-  autoTable(doc, {
-    startY: MARGEN + 24,
-    margin: { left: MARGEN, right: MARGEN, bottom: 16 },
-    head: [['Nombre', 'Venía debiendo', 'Compró', 'Pagó', 'Debe']],
-    body: cuerpo,
-    foot: [[{ content: 'Total por cobrar', colSpan: 4 }, formatearPesos(porCobrar)]],
-    showFoot: 'lastPage',
-    theme: 'plain',
-    rowPageBreak: 'avoid',
-    styles: { font: 'helvetica', fontSize: 11, textColor: TINTA, cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 } },
-    headStyles: { fillColor: MARCA, textColor: [255, 255, 255], fontStyle: 'bold' },
-    footStyles: { fillColor: MARCA, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
-    columnStyles: {
-      1: { halign: 'right', cellWidth: 34 },
-      2: { halign: 'right', cellWidth: 28 },
-      3: { halign: 'right', cellWidth: 28 },
-      4: { halign: 'right', cellWidth: 32 },
-    },
-    didParseCell: ({ section, column, cell }) => {
-      if (section !== 'body' && column.index > 0) cell.styles.halign = 'right'
-    },
-    didDrawCell: ({ section, row, doc: d, cell }) => {
-      // Una línea tenue entre personas para no perderse de renglón.
-      if (section === 'body' && row.raw && Array.isArray(row.raw) && typeof row.raw[0] === 'string') {
-        d.setDrawColor(221, 226, 232).setLineWidth(0.2)
-        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
-      }
-    },
-  })
+  // Una tabla por departamento, con su nombre como título.
+  for (const g of grupos) {
+    // El título no queda solo al final de la hoja: va con al menos un par de renglones.
+    if (y + 30 > alto - 16) {
+      doc.addPage()
+      y = MARGEN + 4
+    }
+    const titulo = g.departamento.toUpperCase()
+    doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(...TINTA)
+    doc.text(titulo, centro, y, { align: 'center' })
+
+    autoTable(doc, {
+      startY: y + 3,
+      // Arriba queda espacio para repetir el título si la tabla sigue en otra hoja.
+      margin: { top: MARGEN + 7, left: MARGEN, right: MARGEN, bottom: 16 },
+      head: [['Nombre', 'Venía debiendo', 'Debe']],
+      body: g.personas.map((s): RowInput => {
+        const f = porFila.get(s.persona_id)!
+        return [f.nombre, saldoEnTabla(f.anterior), { content: saldoEnTabla(f.saldo), styles: { fontStyle: 'bold' } }]
+      }),
+      // Sin color, como la cuenta de cobro.
+      theme: 'grid',
+      rowPageBreak: 'avoid',
+      styles: {
+        font: 'helvetica',
+        fontSize: 11,
+        textColor: TINTA,
+        lineColor: LINEA,
+        lineWidth: 0.3,
+        cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
+      },
+      headStyles: { fillColor: false, fontStyle: 'bold' },
+      columnStyles: {
+        1: { halign: 'right', cellWidth: 40 },
+        2: { halign: 'right', cellWidth: 40 },
+      },
+      didParseCell: ({ section, column, cell }) => {
+        if (section === 'head' && column.index > 0) cell.styles.halign = 'right'
+      },
+      didDrawPage: ({ pageNumber, doc: d }) => {
+        if (pageNumber === 1) return
+        d.setFont('helvetica', 'bold').setFontSize(13).setTextColor(...TINTA)
+        d.text(`${titulo} (continúa)`, centro, MARGEN + 4, { align: 'center' })
+      },
+    })
+    // jspdf-autotable deja la posición final en el documento.
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14
+  }
 
   numerarPaginas(doc)
   return {
@@ -199,8 +193,6 @@ export async function pdfDeCuentaDeCobro(datos: DatosDeCobro, fecha: string, fil
   const total = filas.reduce((suma, f) => suma + f.valorTotal, 0)
 
   doc.setTextColor(...TINTA)
-  doc.setDrawColor(...TINTA).setLineWidth(0.8)
-  doc.line(MARGEN, MARGEN, ancho - MARGEN, MARGEN)
   doc.setFont('helvetica', 'normal').setFontSize(12)
   doc.text(`${datos.ciudad ? `${datos.ciudad}, ` : ''}${fechaDeDocumento(fecha)}`, MARGEN, MARGEN + 10)
 
@@ -251,8 +243,9 @@ export async function pdfDeCuentaDeCobro(datos: DatosDeCobro, fecha: string, fil
       cellPadding: 2.2,
       valign: 'bottom',
     },
-    headStyles: { fillColor: MARCA_SUAVE, fontStyle: 'bold', halign: 'center', valign: 'middle' },
-    footStyles: { fillColor: MARCA_SUAVE, fontStyle: 'bold' },
+    // Sin color, como la cuenta hecha a mano.
+    headStyles: { fillColor: false, fontStyle: 'bold', halign: 'center', valign: 'middle' },
+    footStyles: { fillColor: false, fontStyle: 'bold' },
     columnStyles: {
       0: { cellWidth: 24 },
       1: { cellWidth: 17 },
@@ -273,13 +266,12 @@ export async function pdfDeCuentaDeCobro(datos: DatosDeCobro, fecha: string, fil
     y = lineaConEtiqueta(doc, 'Nota:', datos.nota, y, false)
   }
 
-  // Espacio para firmar a mano encima de la línea.
+  // Espacio para firmar a mano encima de la línea, centrada en la hoja.
   y += 24
-  const firmaX = MARGEN + 10
   doc.setDrawColor(...TINTA).setLineWidth(0.3)
-  doc.line(firmaX, y, firmaX + 75, y)
-  doc.setFont('helvetica', 'bold').setFontSize(12).text(datos.nombre, firmaX + 37.5, y + 6, { align: 'center' })
-  doc.setFont('helvetica', 'normal').text(`CC. ${datos.documento}`, firmaX + 37.5, y + 12, { align: 'center' })
+  doc.line(centro - 37.5, y, centro + 37.5, y)
+  doc.setFont('helvetica', 'bold').setFontSize(12).text(datos.nombre, centro, y + 6, { align: 'center' })
+  doc.setFont('helvetica', 'normal').text(`CC. ${datos.documento}`, centro, y + 12, { align: 'center' })
 
   numerarPaginas(doc)
   return {
