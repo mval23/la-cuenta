@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { DatosAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
 import { ElegirDia } from '../componentes/ElegirDia'
@@ -6,7 +6,7 @@ import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
 import { hoyBogota } from '../lib/fechas'
 import { normalizarNombre, suenanParecido } from '../lib/personas'
-import { formatearPesos } from '../lib/pesos'
+import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Saldo } from '../lib/tipos'
 
@@ -75,6 +75,7 @@ export function DetallePersona({
   saldo: s,
   enPanel,
   volverA = 'Cobrar',
+  diaParaAgregar,
   onVolver,
   onCambio,
   onUnida,
@@ -85,6 +86,11 @@ export function DetallePersona({
   enPanel: boolean
   /** La pantalla a la que lleva "Volver". */
   volverA?: string
+  /**
+   * Desde Registrar se le pueden anotar más compras aquí mismo; empiezan en el
+   * día que se está registrando. Sin esto no aparece el botón.
+   */
+  diaParaAgregar?: string
   onVolver: () => void
   onCambio: () => Promise<void>
   /** Tras unirla con otra persona (que queda archivada): abrir la otra. */
@@ -96,6 +102,7 @@ export function DetallePersona({
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [editando, setEditando] = useState<string | null>(null)
   const [renombrando, setRenombrando] = useState(false)
+  const [agregando, setAgregando] = useState(false)
   // Unir con otra persona: primero se busca con quién, después se confirma.
   const [uniendo, setUniendo] = useState<'buscar' | Quien | null>(null)
   const [uniendoAhora, setUniendoAhora] = useState(false)
@@ -251,6 +258,38 @@ export function DetallePersona({
     return true
   }
 
+  async function agregar(compra: Omit<Correccion, 'quien'>): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('compras')
+      .insert({
+        persona_id: s.persona_id,
+        descripcion: compra.descripcion,
+        valor_pesos: compra.valor,
+        fecha: compra.fecha,
+      })
+      .select('id')
+      .single()
+    if (error) {
+      mostrar({ tipo: 'error', texto: 'No se pudo guardar. Revisa el internet e intenta otra vez.' })
+      return false
+    }
+    setAgregando(false)
+    await Promise.all([cargar(), onCambio()])
+    mostrar({
+      tipo: 'ok',
+      texto:
+        `Guardado: ${[s.nombre, compra.descripcion, formatearPesos(compra.valor)].filter(Boolean).join(', ')}` +
+        (compra.fecha === hoyBogota() ? '' : `, ${fechaCorta(compra.fecha)}`),
+      deshacer: async () => {
+        const { error: errorDeshacer } = await supabase.from('compras').update({ anulada: true }).eq('id', data.id)
+        await Promise.all([cargar(), onCambio()])
+        if (errorDeshacer) mostrar({ tipo: 'error', texto: 'No se pudo deshacer. Revisa el internet.' })
+        else mostrar({ tipo: 'ok', texto: 'Se deshizo la compra.' })
+      },
+    })
+    return true
+  }
+
   async function unir(destino: Quien) {
     setUniendoAhora(true)
     const { error } = await supabase.rpc('unir_personas', { origen: s.persona_id, destino: destino.id })
@@ -326,6 +365,34 @@ export function DetallePersona({
               : `Debe ${formatearPesos(s.saldo)}`}
         </p>
       </div>
+
+      {/* Una archivada ya no compra. */}
+      {diaParaAgregar &&
+        s.activo &&
+        !renombrando &&
+        (agregando ? (
+          <AgregarCompra
+            nombre={s.nombre}
+            dia={diaParaAgregar}
+            onCancelar={() => setAgregando(false)}
+            onGuardar={agregar}
+          />
+        ) : (
+          <Boton
+            variante="tintado"
+            className="self-start"
+            onClick={() => {
+              setEditando(null)
+              setConfirmando(null)
+              setAgregando(true)
+            }}
+          >
+            <span aria-hidden="true" className="mr-1 text-2xl leading-none">
+              +
+            </span>
+            Otra compra
+          </Boton>
+        ))}
 
       {errorDeCarga && <ErrorDeCarga texto="No se pudo cargar el historial." onReintentar={cargar} />}
       {movimientos === null && !errorDeCarga && <p className="text-lg text-tinta-suave">Cargando...</p>}
@@ -502,6 +569,124 @@ function CambiarNombre({
           {guardando ? 'Guardando...' : 'Guardar'}
         </Boton>
       </div>
+    </form>
+  )
+}
+
+/** Anotar otra compra a esta persona sin volver a Registrar. */
+function AgregarCompra({
+  nombre,
+  dia,
+  onCancelar,
+  onGuardar,
+}: {
+  nombre: string
+  /** El día con que empieza: el que se está registrando. */
+  dia: string
+  onCancelar: () => void
+  onGuardar: (compra: Omit<Correccion, 'quien'>) => Promise<boolean>
+}) {
+  const [valor, setValor] = useState('')
+  const [fecha, setFecha] = useState(dia)
+  const [queLlevo, setQueLlevo] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  // Un valor raro (casi siempre un "mil" que falta) se confirma antes de guardar.
+  const [preguntando, setPreguntando] = useState(false)
+  const campoValor = useRef<HTMLInputElement>(null)
+  const hoy = hoyBogota()
+  const numero = Number(valor)
+  const inusual = valorInusual(numero)
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault()
+    if (!(numero > 0) || guardando) return
+    if (inusual && !preguntando) {
+      setPreguntando(true)
+      return
+    }
+    setGuardando(true)
+    // Si salió bien, este formulario se cierra solo.
+    if (!(await onGuardar({ valor: numero, fecha, descripcion: queLlevo.trim() || null }))) setGuardando(false)
+  }
+
+  return (
+    <form onSubmit={guardar} className="flex flex-col gap-4 rounded-xl border border-linea bg-superficie p-4 shadow-sm">
+      <p className="text-xl font-semibold">Otra compra de {nombre}</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
+          <span className="flex min-h-14 items-center rounded-xl border border-control bg-superficie px-4 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-marca">
+            <span aria-hidden="true" className="text-2xl font-bold text-tinta-suave">
+              $
+            </span>
+            <input
+              ref={campoValor}
+              value={valor === '' ? '' : Number(valor).toLocaleString('es-CO')}
+              onChange={(e) => {
+                setPreguntando(false)
+                setValor(soloDigitos(e.target.value))
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              placeholder="0"
+              aria-label="Cuánto, en pesos"
+              className="w-full min-w-0 bg-transparent pl-1 text-2xl font-bold tabular-nums outline-none placeholder:text-tinta-tenue"
+            />
+          </span>
+        </label>
+        <div className="flex flex-col gap-2">
+          <span className="text-base font-semibold text-tinta-suave">Día</span>
+          <ElegirDia dia={fecha} hoy={hoy} etiqueta="Día de la compra" resaltado={fecha !== hoy} onCambiar={setFecha} />
+        </div>
+      </div>
+      <label className="flex flex-col gap-2">
+        <span className="text-base font-semibold text-tinta-suave">
+          Qué llevó <span className="font-normal">(opcional)</span>
+        </span>
+        <input
+          value={queLlevo}
+          onChange={(e) => setQueLlevo(e.target.value)}
+          autoComplete="off"
+          placeholder="Almuerzo, tinto..."
+          className={`${campo} text-xl`}
+        />
+      </label>
+      {preguntando ? (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-aviso-suave p-4">
+          <div className="mr-auto">
+            <p className="text-xl font-semibold">
+              ¿Seguro que son <span className="tabular-nums">{formatearPesos(numero)}</span>?
+            </p>
+            <p className="text-base text-aviso">
+              {inusual === 'bajo' ? 'Parece poco para una compra. ¿Faltó poner "mil"?' : 'Parece mucho para una compra.'}
+            </p>
+          </div>
+          <Boton
+            variante="secundario"
+            compacto
+            onClick={() => {
+              setPreguntando(false)
+              campoValor.current?.focus()
+              campoValor.current?.select()
+            }}
+          >
+            Corregir
+          </Boton>
+          <Boton type="submit" compacto disabled={guardando}>
+            {guardando ? 'Guardando...' : `Sí, son ${formatearPesos(numero)}`}
+          </Boton>
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-end gap-3">
+          <Boton variante="secundario" compacto onClick={onCancelar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" compacto className="min-w-32" disabled={!(numero > 0) || guardando}>
+            {guardando ? 'Guardando...' : 'Guardar'}
+          </Boton>
+        </div>
+      )}
     </form>
   )
 }
