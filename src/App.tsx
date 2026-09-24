@@ -7,11 +7,10 @@ import type { Perfil } from './lib/tipos'
 import { Ajustes } from './pantallas/Ajustes'
 import { Bloqueado, ElegirPin, PedirPin } from './pantallas/Candado'
 import { Cobrar } from './pantallas/Cobrar'
-import { Directorio } from './pantallas/Directorio'
 import { Login } from './pantallas/Login'
 import { Registrar } from './pantallas/Registrar'
 
-type Pestana = 'registrar' | 'cobrar' | 'departamentos' | 'ajustes'
+type Pestana = 'registrar' | 'cobrar' | 'ajustes'
 
 const pestanas: { id: Pestana; titulo: string; icono: ReactNode }[] = [
   {
@@ -28,17 +27,6 @@ const pestanas: { id: Pestana; titulo: string; icono: ReactNode }[] = [
       <>
         <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
         <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
-      </>
-    ),
-  },
-  {
-    id: 'departamentos',
-    titulo: 'Departamentos',
-    icono: (
-      <>
-        <rect x="4" y="2" width="16" height="20" rx="2" />
-        <path d="M9 22v-4h6v4" />
-        <path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" />
       </>
     ),
   },
@@ -76,7 +64,6 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
   const [reinicios, setReinicios] = useState<Record<Pestana, number>>({
     registrar: 0,
     cobrar: 0,
-    departamentos: 0,
     ajustes: 0,
   })
   const [candado, setCandado] = useState<EstadoCandado>(() => estadoDelCandado(localStorage, usuarioId))
@@ -136,16 +123,13 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
         <div hidden={pestana !== 'cobrar'}>
           <Cobrar key={reinicios.cobrar} perfil={perfil} activa={pestana === 'cobrar'} />
         </div>
-        <div hidden={pestana !== 'departamentos'}>
-          <Directorio key={reinicios.departamentos} activa={pestana === 'departamentos'} />
-        </div>
         <div hidden={pestana !== 'ajustes'}>
           <Ajustes key={reinicios.ajustes} perfil={perfil} activa={pestana === 'ajustes'} />
         </div>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-linea bg-superficie/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className="mx-auto grid h-(--alto-pestanas) max-w-2xl grid-cols-4 gap-2 px-3 py-1.5">
+        <div className="mx-auto grid h-(--alto-pestanas) max-w-2xl grid-cols-3 gap-2 px-3 py-1.5">
           {pestanas.map((p) => (
             <button
               key={p.id}
