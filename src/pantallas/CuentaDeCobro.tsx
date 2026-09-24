@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
 import { BotonPdf } from '../componentes/BotonPdf'
 import { ElegirDia } from '../componentes/ElegirDia'
@@ -81,6 +81,8 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
   const [escribir, setEscribir] = useState(false)
   const [escrito, setEscrito] = useState('')
   const [borrando, setBorrando] = useState(false)
+  // Lo último guardado en la base de a quién se le cobra; null mientras carga.
+  const guardados = useRef<Pick<DatosDeCobro, 'cliente_nombre' | 'cliente_nit' | 'concepto'> | null>(null)
 
   const cargar = useCallback(async () => {
     const { data, error } = await supabase
@@ -90,12 +92,13 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
     setErrorDeCarga(error !== null || data === null)
     if (!data) return
     setDatos(data)
-    // Sin borrador, se propone la última empresa a la que se le cobró.
-    if (!inicial) {
+    guardados.current = { cliente_nombre: data.cliente_nombre, cliente_nit: data.cliente_nit, concepto: data.concepto }
+    // Se propone la última empresa guardada si el borrador no trae una.
+    if (!inicial?.cliente_nombre.trim()) {
       setCliente(data.cliente_nombre)
       setNit(data.cliente_nit)
-      setConcepto(data.concepto)
     }
+    if (!inicial?.concepto.trim()) setConcepto(data.concepto)
     if (!data.nombre || !data.documento) setEditandoDatos(true)
   }, [inicial])
 
@@ -106,6 +109,29 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
   useEffect(() => {
     guardarBorrador({ fecha, cliente_nombre: cliente, cliente_nit: nit, concepto, filas, dictados })
   }, [fecha, cliente, nit, concepto, filas, dictados])
+
+  // La empresa, el NIT y el concepto se guardan en la base poco después de
+  // escribirlos, sin esperar al PDF: así salen la próxima vez y en el otro iPad.
+  useEffect(() => {
+    const antes = guardados.current
+    const cliente_nombre = cliente.trim()
+    if (!antes || !cliente_nombre) return
+    const nuevos = { cliente_nombre, cliente_nit: nit.trim(), concepto: concepto.trim() || antes.concepto }
+    if (
+      nuevos.cliente_nombre === antes.cliente_nombre &&
+      nuevos.cliente_nit === antes.cliente_nit &&
+      nuevos.concepto === antes.concepto
+    ) {
+      return
+    }
+    const espera = setTimeout(async () => {
+      const { error } = await supabase.from('datos_de_cobro').update(nuevos).eq('id', true)
+      // Si falla, se intenta otra vez al cambiar algo o al hacer el PDF.
+      if (!error) guardados.current = nuevos
+    }, 1000)
+    return () => clearTimeout(espera)
+    // Con datos: lo que se escribió mientras cargaba se guarda al terminar de cargar.
+  }, [datos, cliente, nit, concepto])
 
   const avisarError = (texto: string) => mostrar({ tipo: 'error', texto })
 
@@ -228,7 +254,10 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
       )}
 
       <div className="flex flex-col gap-4">
-        <h2 className="text-xl font-semibold">A quién se le cobra</h2>
+        <div>
+          <h2 className="text-xl font-semibold">A quién se le cobra</h2>
+          <p className="text-base text-tinta-suave">Queda guardado para la próxima cuenta.</p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <label className="flex flex-col gap-1">
             <span className={etiqueta}>Empresa</span>
