@@ -320,6 +320,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
           saldo={abierta}
           enPanel={false}
           volverA="Registrar"
+          diaParaAgregar={dia}
           onVolver={() => setAbierta(null)}
           onCambio={alCambiarDetalle}
           onUnida={async (id) => {
