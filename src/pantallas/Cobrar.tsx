@@ -5,7 +5,7 @@ import { useAviso } from '../componentes/useAviso'
 import { usePantallaAncha } from '../componentes/usePantallaAncha'
 import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import { PanelDePago } from '../componentes/Pago'
 import { agruparParaCobro, type GrupoDeCobro } from '../lib/cobro'
 import { guardarPago, type TipoDePago } from '../lib/pagos'
@@ -218,7 +218,7 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-tinta-suave">Buscar persona o departamento</span>
+        <span className={etiqueta}>Buscar persona o departamento</span>
         <input
           type="search"
           value={busqueda}

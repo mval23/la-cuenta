@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { Aviso } from '../componentes/Aviso'
 import { Boton, BotonVolver } from '../componentes/Boton'
+import { Confirmar } from '../componentes/Confirmar'
 import { useAviso } from '../componentes/useAviso'
 import { olvidarPin } from '../lib/candado'
 import { supabase } from '../lib/supabase'
@@ -120,25 +121,22 @@ function Inicio({
         <p className="text-lg text-tinta-suave">Usuaria: {perfil.nombre}</p>
         {saliendo ? (
           // Para volver a entrar hay que configurar el dispositivo otra vez: mejor preguntar antes.
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
-            <span className="mr-auto text-lg">
-              {perfil.rol === 'admin'
-                ? '¿Cerrar sesión? Para volver a entrar hay que configurar este dispositivo otra vez con la contraseña de la cuenta.'
-                : '¿Cerrar sesión? Para volver a entrar vas a necesitar a Mariana, que tiene la contraseña de la cuenta.'}
-            </span>
-            <Boton variante="secundario" compacto onClick={() => setSaliendo(false)}>
-              No
-            </Boton>
-            <Boton
-              compacto
-              onClick={() => {
-                olvidarPin(localStorage)
-                void supabase.auth.signOut()
-              }}
-            >
-              Sí, cerrar sesión
-            </Boton>
-          </div>
+          <Confirmar
+            forma="tarjeta"
+            tono="aviso"
+            pregunta="¿Cerrar sesión?"
+            detalle={
+              perfil.rol === 'admin'
+                ? 'Para volver a entrar hay que configurar este dispositivo otra vez con la contraseña de la cuenta.'
+                : 'Para volver a entrar vas a necesitar a Mariana, que tiene la contraseña de la cuenta.'
+            }
+            textoSi="Sí, cerrar sesión"
+            onNo={() => setSaliendo(false)}
+            onSi={() => {
+              olvidarPin(localStorage)
+              void supabase.auth.signOut()
+            }}
+          />
         ) : (
           <Boton variante="secundario" className="self-start" onClick={() => setSaliendo(true)}>
             Cerrar sesión

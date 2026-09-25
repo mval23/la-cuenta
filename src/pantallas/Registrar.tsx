@@ -2,9 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEve
 import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
 import { Boton } from '../componentes/Boton'
+import { Confirmar } from '../componentes/Confirmar'
 import { Calendario, ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
 import { Parecidas } from '../componentes/Parecidas'
 import { leerDictado } from '../lib/dictado'
@@ -553,7 +554,6 @@ function Confirmacion({
     setModo('nueva')
   }
   const otroDia = b.fecha !== hoy
-  const etiqueta = 'text-base font-semibold text-tinta-suave'
 
   const valor = Number(b.valor)
   const faltan = [
@@ -780,7 +780,7 @@ function Confirmacion({
       {/* Qué llevó: opcional */}
       {conDescripcion ? (
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">
+          <span className={etiqueta}>
             Qué llevó <span className="font-normal">(opcional)</span>
           </span>
           <input
@@ -804,8 +804,14 @@ function Confirmacion({
 
 function PreguntaAnular({ compra: c, onSi, onNo }: { compra: CompraDelDia; onSi: () => void; onNo: () => void }) {
   return (
-    <div role="alert" className="flex flex-col gap-4 rounded-2xl border-2 border-peligro-linea bg-peligro-suave p-5">
-      <p className="text-xl font-bold">¿Anular la última compra?</p>
+    <Confirmar
+      forma="tarjeta"
+      className="border-2 border-peligro-linea"
+      pregunta="¿Anular la última compra?"
+      textoSi="Sí, anular"
+      onNo={onNo}
+      onSi={onSi}
+    >
       <div className="rounded-xl bg-superficie px-4 py-3">
         <p className="text-xl">
           <span className="font-semibold">{c.personas?.nombre}</span>{' '}
@@ -816,15 +822,7 @@ function PreguntaAnular({ compra: c, onSi, onNo }: { compra: CompraDelDia; onSi:
           {c.descripcion && ` · ${c.descripcion}`} · anotada a las {hora(c.creada_en)}
         </p>
       </div>
-      <div className="flex flex-wrap justify-end gap-3">
-        <Boton variante="secundario" onClick={onNo}>
-          No
-        </Boton>
-        <Boton variante="peligro" onClick={onSi}>
-          Sí, anular
-        </Boton>
-      </div>
-    </div>
+    </Confirmar>
   )
 }
 
@@ -912,22 +910,15 @@ function ComprasDelDia({
               )}
             </div>
             {confirmando === c.id && (
-              <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
-                <span className="mr-auto text-lg">¿Anular esta compra?</span>
-                <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
-                  No
-                </Boton>
-                <Boton
-                  variante="peligro"
-                  compacto
-                  onClick={() => {
-                    setConfirmando(null)
-                    onAnular(c)
-                  }}
-                >
-                  Sí, anular
-                </Boton>
-              </div>
+              <Confirmar
+                pregunta="¿Anular esta compra?"
+                textoSi="Sí, anular"
+                onNo={() => setConfirmando(null)}
+                onSi={() => {
+                  setConfirmando(null)
+                  onAnular(c)
+                }}
+              />
             )}
           </li>
         ))}

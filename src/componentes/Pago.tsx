@@ -3,7 +3,8 @@
 
 import { useState, type FormEvent } from 'react'
 import { Boton } from './Boton'
-import { campo } from './estilos'
+import { Confirmar } from './Confirmar'
+import { campo, etiqueta } from './estilos'
 import { formatearPesos } from '../lib/pesos'
 import type { TipoDePago } from '../lib/pagos'
 import type { Saldo } from '../lib/tipos'
@@ -40,17 +41,20 @@ export function PanelDePago({
 
   if (tipo === 'total') {
     return (
-      <div className={`flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-marca-suave px-4 py-3 ${className}`}>
-        <span className="mr-auto text-lg">
-          ¿{s.nombre} pagó <span className="font-semibold tabular-nums">{formatearPesos(s.saldo)}</span>?
-        </span>
-        <Boton variante="secundario" compacto disabled={guardando} onClick={onCerrar}>
-          No
-        </Boton>
-        <Boton compacto disabled={guardando} onClick={() => pagar(s.saldo)}>
-          {guardando ? 'Guardando...' : 'Sí, pagó'}
-        </Boton>
-      </div>
+      <Confirmar
+        tono="marca"
+        className={className}
+        pregunta={
+          <>
+            ¿{s.nombre} pagó <span className="font-semibold tabular-nums">{formatearPesos(s.saldo)}</span>?
+          </>
+        }
+        textoSi="Sí, pagó"
+        ocupado={guardando}
+        textoOcupado="Guardando..."
+        onNo={onCerrar}
+        onSi={() => pagar(s.saldo)}
+      />
     )
   }
 
@@ -58,7 +62,7 @@ export function PanelDePago({
     <form onSubmit={guardarAbono} className={`flex flex-col gap-2 bg-marca-suave px-4 py-3 ${className}`}>
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
         <label className="flex flex-col gap-1">
-          <span className="text-base font-semibold text-tinta-suave">Cuánto abonó</span>
+          <span className={etiqueta}>Cuánto abonó</span>
           <input
             value={abono}
             onChange={(e) => setAbono(e.target.value.replace(/\D/g, '').replace(/^0+/, ''))}

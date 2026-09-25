@@ -68,6 +68,13 @@
  * 17px, el texto normal de iPadOS. Todo lo demás se mide en rem a partir de
  * aquí. En el iPad, lib/letra.ts lo agranda un poco si Amparo tiene el texto
  * del sistema más grande, con tope: sumado entero, no cabía nada.
+ *
+ * Escala (con la raíz en 17px):
+ *   text-base  17px  solo datos de apoyo: la hora, "· 12 personas", etiquetas de campos
+ *   text-lg    19px  el texto normal, y todo lo que explica una consecuencia o un error
+ *   text-xl    21px  títulos de sección y la pregunta de una confirmación
+ *   text-titulo 28px el título de cada pantalla
+ *   text-3xl   30px  cifras clave: el saldo, el valor de una compra
  */
 html {
   font-size: 106.25%;

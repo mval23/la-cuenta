@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DIAS_ATRAS_PERMITIDOS,
   fechaLarga,
@@ -94,8 +94,32 @@ export function Calendario({
   const hayAnterior = sumarMeses(mes, -1) >= mesDe(minimo)
   const haySiguiente = sumarMeses(mes, 1) <= mesDe(hoy)
 
+  // Al abrir, el foco entra al calendario; al cerrar, vuelve al botón que lo abrió.
+  const caja = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar()
+    const antes = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    caja.current?.focus()
+    return () => antes?.focus()
+  }, [])
+
+  // Escape cierra, y con Tab no se sale del calendario mientras está abierto.
+  useEffect(() => {
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCerrar()
+      if (e.key !== 'Tab' || !caja.current) return
+      const botones = [...caja.current.querySelectorAll<HTMLElement>('button:not(:disabled)')]
+      const primero = botones[0]
+      const ultimo = botones.at(-1)
+      if (!primero || !ultimo) return
+      const actual = document.activeElement
+      if (e.shiftKey && (actual === primero || actual === caja.current)) {
+        e.preventDefault()
+        ultimo.focus()
+      } else if (!e.shiftKey && actual === ultimo) {
+        e.preventDefault()
+        primero.focus()
+      }
+    }
     document.addEventListener('keydown', alTeclear)
     return () => document.removeEventListener('keydown', alTeclear)
   }, [onCerrar])
@@ -106,11 +130,13 @@ export function Calendario({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-tinta/40 p-4" onClick={onCerrar}>
       <div
+        ref={caja}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-full w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl bg-superficie p-5 shadow-xl"
+        className="flex max-h-full w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl bg-superficie p-5 shadow-xl focus:outline-none"
       >
         <p className="text-2xl font-bold">{titulo}</p>
 

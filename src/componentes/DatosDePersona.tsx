@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { Boton } from './Boton'
 import { BuscarPersona, type Quien } from './BuscarPersona'
+import { Confirmar } from './Confirmar'
 import { ErrorDeCarga } from './ErrorDeCarga'
-import { campo } from './estilos'
+import { campo, etiqueta } from './estilos'
 import { MensajeDeError } from './MensajeDeError'
 import type { DatosAviso } from './useAviso'
 import { formatearPesos } from '../lib/pesos'
@@ -152,21 +153,21 @@ export function DatosDePersona({
       )}
 
       {abierto === 'archivar' && (
-        <div role="alert" className="flex flex-col gap-3 rounded-xl bg-peligro-suave p-4">
-          <p className="text-lg">
-            ¿Archivar a <span className="font-semibold">{s.nombre}</span>? Ya no aparece al registrar ni al dictar.
-            {debe && ` Lo que debe (${formatearPesos(s.saldo)}) sigue en Cobrar.`} Se puede volver a mostrar cuando
-            quieras.
-          </p>
-          <div className="flex flex-wrap justify-end gap-3">
-            <Boton variante="secundario" compacto disabled={trabajando} onClick={cerrar}>
-              No
-            </Boton>
-            <Boton variante="peligro" compacto disabled={trabajando} onClick={() => cambiarActivo(false)}>
-              Sí, archivar
-            </Boton>
-          </div>
-        </div>
+        <Confirmar
+          forma="tarjeta"
+          pregunta={`¿Archivar a ${s.nombre}?`}
+          detalle={
+            <>
+              Ya no aparece al registrar ni al dictar.
+              {debe && ` Lo que debe (${formatearPesos(s.saldo)}) sigue en Cobrar.`} Se puede volver a mostrar cuando
+              quieras.
+            </>
+          }
+          textoSi="Sí, archivar"
+          ocupado={trabajando}
+          onNo={cerrar}
+          onSi={() => cambiarActivo(false)}
+        />
       )}
 
       {abierto === 'unir' && unirCon === null && (
@@ -183,24 +184,23 @@ export function DatosDePersona({
       )}
 
       {abierto === 'unir' && unirCon !== null && (
-        <div role="alert" className="flex flex-col gap-3 rounded-xl bg-aviso-suave p-4">
-          <p className="text-xl font-semibold">
-            ¿Unir a {s.nombre} con {unirCon.nombre} · {unirCon.departamento}?
-          </p>
-          <p className="text-lg">
-            Todo lo de {s.nombre}
-            {s.saldo !== 0 && ` (${s.saldo < 0 ? 'a favor' : 'debe'} ${formatearPesos(Math.abs(s.saldo))})`} pasa a{' '}
-            {unirCon.nombre}, y {s.nombre} se archiva. No se puede deshacer.
-          </p>
-          <div className="flex flex-wrap justify-end gap-3">
-            <Boton variante="secundario" compacto onClick={cerrar} disabled={trabajando}>
-              No
-            </Boton>
-            <Boton compacto onClick={() => unir(unirCon)} disabled={trabajando}>
-              {trabajando ? 'Uniendo...' : 'Sí, unir'}
-            </Boton>
-          </div>
-        </div>
+        <Confirmar
+          forma="tarjeta"
+          tono="aviso"
+          pregunta={`¿Unir a ${s.nombre} con ${unirCon.nombre} · ${unirCon.departamento}?`}
+          detalle={
+            <>
+              Todo lo de {s.nombre}
+              {s.saldo !== 0 && ` (${s.saldo < 0 ? 'a favor' : 'debe'} ${formatearPesos(Math.abs(s.saldo))})`} pasa a{' '}
+              {unirCon.nombre}, y {s.nombre} se archiva. No se puede deshacer.
+            </>
+          }
+          textoSi="Sí, unir"
+          ocupado={trabajando}
+          textoOcupado="Uniendo..."
+          onNo={cerrar}
+          onSi={() => unir(unirCon)}
+        />
       )}
     </section>
   )
@@ -237,7 +237,7 @@ function CambiarNombre({
   return (
     <form onSubmit={guardar} className="flex flex-col gap-3 rounded-xl bg-hundido p-4">
       <label className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-tinta-suave">Nombre y apellido</span>
+        <span className={etiqueta}>Nombre y apellido</span>
         <input
           value={nombre}
           onChange={(e) => {
@@ -310,7 +310,7 @@ function CambiarDepartamento({
   return (
     <form onSubmit={guardar} className="flex flex-col gap-3 rounded-xl bg-hundido p-4">
       <label className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-tinta-suave">Departamento</span>
+        <span className={etiqueta}>Departamento</span>
         <select
           value={elegido}
           onChange={(e) => {

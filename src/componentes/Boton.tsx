@@ -1,5 +1,16 @@
 import type { ButtonHTMLAttributes } from 'react'
 
+/*
+ * Cuándo usar cada una:
+ *   principal   la acción del bloque: una sola ("Guardar $12.000", "Entrar").
+ *               Dice el verbo, y la cifra si hay plata de por medio.
+ *   tintado     la acción más común de una pantalla o renglón ("Pagó todo", "+ Otra compra").
+ *   secundario  todo lo demás que haya que encontrar: "Cancelar", "Volver", "Anotar
+ *               a mano", "Anular" en un renglón. Tiene borde para que se vea que se toca.
+ *   peligro     solo el "Sí" que confirma anular o archivar (ver Confirmar).
+ *   texto       solo lo opcional, que se puede ignorar ("+ Anotar qué llevó").
+ * Nunca un ícono solo: siempre con palabra.
+ */
 type Variante = 'principal' | 'tintado' | 'secundario' | 'peligro' | 'texto'
 
 const estilos: Record<Variante, string> = {

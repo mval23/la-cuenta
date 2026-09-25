@@ -3,7 +3,8 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Boton } from './Boton'
-import { campo } from './estilos'
+import { Confirmar } from './Confirmar'
+import { campo, etiqueta } from './estilos'
 import { MensajeDeError } from './MensajeDeError'
 import { Microfono } from './Microfono'
 import { Parecidas } from './Parecidas'
@@ -133,23 +134,23 @@ export function AgregarPersona({
       </div>
       {error && <MensajeDeError id={idError} texto={error} />}
       {preguntando && (
-        <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
-          <span className="mr-auto text-lg">
-            ¿Agregar a <span className="font-semibold">{nombre.trim()}</span> antes de cerrar?
-          </span>
-          <Boton variante="secundario" compacto disabled={guardando} onClick={onCerrar}>
-            No, cerrar
-          </Boton>
-          <Boton
-            compacto
-            disabled={guardando}
-            onClick={async () => {
-              if (await guardar()) onCerrar()
-            }}
-          >
-            {guardando ? 'Agregando...' : 'Sí, agregar'}
-          </Boton>
-        </div>
+        <Confirmar
+          forma="tarjeta"
+          tono="aviso"
+          pregunta={
+            <>
+              ¿Agregar a <span className="font-semibold">{nombre.trim()}</span> antes de cerrar?
+            </>
+          }
+          textoNo="No, cerrar"
+          textoSi="Sí, agregar"
+          ocupado={guardando}
+          textoOcupado="Agregando..."
+          onNo={onCerrar}
+          onSi={async () => {
+            if (await guardar()) onCerrar()
+          }}
+        />
       )}
       <Parecidas nombre={nombre} personas={todas} nombreDepto={nombreDepto} />
     </form>
@@ -196,7 +197,7 @@ export function NuevoDepartamento({
     <form onSubmit={agregar} className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-          <span className="text-base font-semibold text-tinta-suave">Nombre del departamento nuevo</span>
+          <span className={etiqueta}>Nombre del departamento nuevo</span>
           <input
             value={nombre}
             onChange={(e) => {

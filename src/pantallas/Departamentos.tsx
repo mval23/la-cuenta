@@ -1,8 +1,9 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
+import { Confirmar } from '../componentes/Confirmar'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import type { DatosAviso } from '../componentes/useAviso'
 import { supabase } from '../lib/supabase'
 import type { Departamento } from '../lib/tipos'
@@ -90,7 +91,7 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
 
   async function reactivar(d: Departamento) {
     if (await actualizar(d.id, { activo: true })) {
-      mostrar({ tipo: 'ok', texto: `${d.nombre} volvió a estar activo.` })
+      mostrar({ tipo: 'ok', texto: `${d.nombre} vuelve a aparecer al registrar.` })
     }
   }
 
@@ -161,17 +162,17 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
                   </Boton>
                 </div>
                 {porArchivar === d.id && (
-                  <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
-                    <span className="mr-auto text-lg">
-                      ¿Archivar <span className="font-semibold">{d.nombre}</span>? {consecuencia(cuantas.get(d.id) ?? 0)}
-                    </span>
-                    <Boton variante="secundario" compacto onClick={() => setPorArchivar(null)}>
-                      No
-                    </Boton>
-                    <Boton variante="peligro" compacto onClick={() => archivar(d)}>
-                      Sí, archivar
-                    </Boton>
-                  </div>
+                  <Confirmar
+                    pregunta={
+                      <>
+                        ¿Archivar <span className="font-semibold">{d.nombre}</span>?{' '}
+                        {consecuencia(cuantas.get(d.id) ?? 0)}
+                      </>
+                    }
+                    textoSi="Sí, archivar"
+                    onNo={() => setPorArchivar(null)}
+                    onSi={() => archivar(d)}
+                  />
                 )}
               </li>
             ),
@@ -181,7 +182,7 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
 
       <form onSubmit={agregar} className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-          <span className="text-base font-semibold text-tinta-suave">Nombre del departamento nuevo</span>
+          <span className={etiqueta}>Nombre del departamento nuevo</span>
           <input value={nuevo} onChange={(e) => setNuevo(e.target.value)} autoComplete="off" className={campo} />
         </label>
         <Boton type="submit" disabled={!nuevo.trim()}>
@@ -194,12 +195,18 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
           <summary className="min-h-11 cursor-pointer content-center text-lg font-semibold text-tinta-suave">
             Archivados ({archivados.length})
           </summary>
+          <p className="mt-2 text-lg text-tinta-suave">Sus personas no aparecen al registrar.</p>
           <ul className="mt-3 flex flex-col gap-3">
             {archivados.map((d) => (
               <li key={d.id} className="flex items-center gap-3">
                 <span className="flex-1 text-lg text-tinta-suave">{d.nombre}</span>
-                <Boton variante="secundario" compacto onClick={() => reactivar(d)}>
-                  Reactivar
+                <Boton
+                  variante="secundario"
+                  compacto
+                  aria-label={`Volver a mostrar ${d.nombre}`}
+                  onClick={() => reactivar(d)}
+                >
+                  Volver a mostrar
                 </Boton>
               </li>
             ))}
@@ -232,11 +239,11 @@ function EditarDepartamento({
     <li className="bg-marca-suave p-4">
       <form onSubmit={guardar} className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Nombre</span>
+          <span className={etiqueta}>Nombre</span>
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={campo} />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Otras formas de decirlo (separadas por coma)</span>
+          <span className={etiqueta}>Otras formas de decirlo (separadas por coma)</span>
           <input
             value={alias}
             onChange={(e) => setAlias(e.target.value)}
