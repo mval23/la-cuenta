@@ -3,17 +3,19 @@ import type { DatosAviso } from '../componentes/useAviso'
 import { Boton, BotonVolver } from '../componentes/Boton'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
+import { BuscarPersona, type Quien } from '../componentes/BuscarPersona'
+import { DatosDePersona } from '../componentes/DatosDePersona'
 import { campo } from '../componentes/estilos'
 import { PanelDePago } from '../componentes/Pago'
-import { hoyBogota } from '../lib/fechas'
+import { fechaLarga, hoyBogota, inicioDeQuincenas, nombreDeQuincena, quincenaDe, type Quincena } from '../lib/fechas'
 import type { TipoDePago } from '../lib/pagos'
-import { normalizarNombre, suenanParecido } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Saldo } from '../lib/tipos'
 
-// Cuánto historial se muestra: alcanza para revisar varias quincenas.
-const DIAS_DE_HISTORIAL = 90
+// Cuántas quincenas de historial se ven al abrir (unos tres meses); "Ver más
+// atrás" agrega otras tantas.
+const QUINCENAS_POR_VEZ = 6
 
 /**
  * Compras y pagos no se editan en la base: corregir anota uno nuevo y anula el
@@ -34,13 +36,6 @@ interface Movimiento {
   descripcion: string | null
   /** Lo que hace falta para anotarlo de nuevo al corregirlo. */
   copia: Record<string, unknown>
-}
-
-/** De quién es: al corregir se puede pasar a otra persona. */
-interface Quien {
-  id: number
-  nombre: string
-  departamento: string
 }
 
 /** Lo que se puede cambiar al corregir. */
@@ -105,19 +100,20 @@ export function DetallePersona({
   onUnida: (personaId: number) => Promise<void>
   mostrar: (aviso: DatosAviso) => void
 }) {
-  const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null)
+  // Con el día desde el que se trajeron: el saldo anterior se calcula con ese día.
+  const [cargados, setCargados] = useState<{ desde: string; lista: Movimiento[] } | null>(null)
+  const movimientos = cargados?.lista ?? null
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [editando, setEditando] = useState<string | null>(null)
-  const [renombrando, setRenombrando] = useState(false)
   const [agregando, setAgregando] = useState(false)
   const [pagando, setPagando] = useState<TipoDePago | null>(null)
-  // Unir con otra persona: primero se busca con quién, después se confirma.
-  const [uniendo, setUniendo] = useState<'buscar' | Quien | null>(null)
-  const [uniendoAhora, setUniendoAhora] = useState(false)
+  const [quincenas, setQuincenas] = useState(QUINCENAS_POR_VEZ)
+  const desde = inicioDeQuincenas(hoyBogota(), quincenas)
+  // Se pidió más atrás y todavía no llega.
+  const trayendoMas = cargados !== null && cargados.desde !== desde
 
   const cargar = useCallback(async () => {
-    const desde = new Date(Date.now() - DIAS_DE_HISTORIAL * 86_400_000).toISOString().slice(0, 10)
     const [compras, pagos] = await Promise.all([
       supabase
         .from('compras')
@@ -135,8 +131,9 @@ export function DetallePersona({
       return
     }
     setErrorDeCarga(false)
-    setMovimientos(
-      [
+    setCargados({
+      desde,
+      lista: [
         ...compras.data
           .filter((c) => c.anulada_motivo !== MOTIVO_CORREGIDA)
           .map((c): Movimiento => ({
@@ -167,8 +164,8 @@ export function DetallePersona({
           })),
         // Por día, y dentro del día lo último primero: lo corregido queda en su día.
       ].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado)),
-    )
-  }, [s.persona_id])
+    })
+  }, [s.persona_id, desde])
 
   // También cada vez que la pantalla de afuera vuelve a traer el saldo: se pudo
   // pagar desde la lista, o anotar algo en otra pestaña.
@@ -249,24 +246,6 @@ export function DetallePersona({
     return true
   }
 
-  async function renombrar(nombre: string): Promise<boolean> {
-    const { error } = await supabase.from('personas').update({ nombre }).eq('id', s.persona_id)
-    if (error) {
-      mostrar({
-        tipo: 'error',
-        texto:
-          error.code === '23505'
-            ? `Ya hay una persona llamada ${nombre} en ${s.departamento}.`
-            : 'No se pudo cambiar el nombre. Revisa el internet e intenta otra vez.',
-      })
-      return false
-    }
-    await onCambio()
-    setRenombrando(false)
-    mostrar({ tipo: 'ok', texto: `Se cambió el nombre: ahora es ${nombre}.` })
-    return true
-  }
-
   async function agregar(compra: Omit<Correccion, 'quien'>): Promise<boolean> {
     const { data, error } = await supabase
       .from('compras')
@@ -299,30 +278,111 @@ export function DetallePersona({
     return true
   }
 
-  async function unir(destino: Quien) {
-    setUniendoAhora(true)
-    const { error } = await supabase.rpc('unir_personas', { origen: s.persona_id, destino: destino.id })
-    setUniendoAhora(false)
-    if (error) {
-      mostrar({
-        tipo: 'error',
-        texto: error.message.includes('archivada')
-          ? 'No se pudo unir: una de las dos ya está archivada. Quizás ya se unieron.'
-          : 'No se pudo unir. Revisa el internet e intenta otra vez.',
-      })
-      return
-    }
-    setUniendo(null)
-    mostrar({ tipo: 'ok', texto: `Se unió ${s.nombre} con ${destino.nombre}. Ahora todo está en ${destino.nombre}.` })
-    await onUnida(destino.id)
-  }
-
   /** Abre un formulario de arriba y cierra lo que estuviera abierto en la lista. */
   function abrir(cual: () => void) {
     setEditando(null)
     setConfirmando(null)
     cual()
   }
+
+  /** Una compra o un pago del historial: se toca para corregirlo. */
+  function renglon(m: Movimiento) {
+    const esPago = m.tabla === 'pagos'
+    const contenido = (
+      <>
+        <div className={`min-w-0 flex-1 ${m.anulado ? 'text-tinta-tenue line-through' : ''}`}>
+          {/* El día va primero y grande: así se busca en el historial. */}
+          <p className="text-lg font-semibold">{fechaCorta(m.fecha)}</p>
+          <p
+            className={`text-base ${esPago && !m.anulado ? 'font-semibold text-exito' : m.anulado ? '' : 'text-tinta-suave'}`}
+          >
+            {m.texto}
+          </p>
+        </div>
+        <span
+          className={`text-lg font-semibold tabular-nums ${
+            m.anulado ? 'text-tinta-tenue line-through' : esPago ? 'text-exito' : ''
+          }`}
+        >
+          {esPago ? '−' : ''}
+          {formatearPesos(m.valor)}
+        </span>
+      </>
+    )
+    const clasesRenglon = 'flex min-w-0 flex-1 items-center gap-3 py-2 pl-4 text-left'
+    return (
+      <li key={m.clave}>
+        <div className="flex items-center gap-3 pr-3">
+          {/* Lo anulado no se corrige: primero se recupera con Deshacer. */}
+          {m.anulado ? (
+            <div className={clasesRenglon}>{contenido}</div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmando(null)
+                setEditando(editando === m.clave ? null : m.clave)
+              }}
+              aria-expanded={editando === m.clave}
+              className={`${clasesRenglon} active:bg-hundido`}
+            >
+              {contenido}
+            </button>
+          )}
+          {m.anulado ? (
+            <span className="w-24 text-center text-base text-tinta-suave">Anulado</span>
+          ) : (
+            <Boton
+              variante="secundario"
+              compacto
+              className="w-24"
+              aria-label={`Anular: ${m.texto}, ${fechaCorta(m.fecha)}, ${formatearPesos(m.valor)}`}
+              disabled={confirmando === m.clave}
+              onClick={() => {
+                setEditando(null)
+                setConfirmando(m.clave)
+              }}
+            >
+              Anular
+            </Boton>
+          )}
+        </div>
+        {confirmando === m.clave && (
+          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
+            <span className="mr-auto text-lg">¿Anular {esPago ? 'este pago' : 'esta compra'}?</span>
+            <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
+              No
+            </Boton>
+            <Boton variante="peligro" compacto onClick={() => anular(m)}>
+              Sí, anular
+            </Boton>
+          </div>
+        )}
+        {editando === m.clave && (
+          <Editar
+            movimiento={m}
+            persona={{ id: s.persona_id, nombre: s.nombre, departamento: s.departamento }}
+            onCancelar={() => setEditando(null)}
+            onGuardar={(correccion) => corregir(m, correccion)}
+          />
+        )}
+      </li>
+    )
+  }
+
+  const suma = (lista: Movimiento[], tabla: Movimiento['tabla']) =>
+    lista.filter((m) => !m.anulado && m.tabla === tabla).reduce((total, m) => total + m.valor, 0)
+  // Por quincena, de la más reciente a la más vieja (la lista ya viene así).
+  const grupos: { quincena: Quincena; lista: Movimiento[] }[] = []
+  for (const m of movimientos ?? []) {
+    const quincena = quincenaDe(m.fecha)
+    const ultimo = grupos.at(-1)
+    if (ultimo?.quincena.desde === quincena.desde) ultimo.lista.push(m)
+    else grupos.push({ quincena, lista: [m] })
+  }
+  // Lo que venía debiendo de antes de lo que se ve: así el saldo de arriba cuadra con la lista.
+  const anterior = cargados && s.saldo - (suma(cargados.lista, 'compras') - suma(cargados.lista, 'pagos'))
+  const Subtitulo = enPanel ? 'h3' : 'h2'
 
   const puedeAgregar = diaParaAgregar !== undefined && s.activo
   const aFavor = s.saldo < 0
@@ -338,29 +398,15 @@ export function DetallePersona({
       <div
         className={`flex justify-between gap-x-4 gap-y-2 ${enPanel ? 'flex-col' : 'flex-wrap items-end'}`}
       >
-        <div className={`flex items-start justify-between gap-4 ${renombrando ? 'w-full' : ''}`}>
-          {renombrando ? (
-            <CambiarNombre nombre={s.nombre} onCancelar={() => setRenombrando(false)} onGuardar={renombrar} />
-          ) : (
-            <div className="flex min-w-0 flex-col gap-1">
-              <Titulo className="text-titulo font-bold">{s.nombre}</Titulo>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <p className="text-lg text-tinta-suave">
-                  {s.departamento}
-                  {!s.activo && ' · Archivada'}
-                </p>
-                <Boton
-                  variante="secundario"
-                  compacto
-                  aria-label={`Cambiar nombre de ${s.nombre}`}
-                  onClick={() => setRenombrando(true)}
-                >
-                  Cambiar nombre
-                </Boton>
-              </div>
-            </div>
-          )}
-          {enPanel && !renombrando && (
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <Titulo className="text-titulo font-bold">{s.nombre}</Titulo>
+            <p className="text-lg text-tinta-suave">
+              {s.departamento}
+              {!s.activo && ' · Archivada'}
+            </p>
+          </div>
+          {enPanel && (
             <Boton variante="texto" compacto className="-mr-3" onClick={onVolver}>
               Cerrar
             </Boton>
@@ -377,7 +423,7 @@ export function DetallePersona({
 
       {/* Cobrarle aquí mismo; una archivada que debe también puede pagar, pero ya no compra.
           Desde Registrar lo principal es anotar otra compra; desde Cobrar, el pago. */}
-      {!renombrando && pagando === null && !agregando && (s.saldo > 0 || puedeAgregar) && (
+      {pagando === null && !agregando && (s.saldo > 0 || puedeAgregar) && (
         <div className="flex flex-wrap gap-3">
           {puedeAgregar && (
             <Boton variante="tintado" onClick={() => abrir(() => setAgregando(true))}>
@@ -421,191 +467,64 @@ export function DetallePersona({
       )}
 
       {errorDeCarga && <ErrorDeCarga texto="No se pudo cargar el historial." onReintentar={cargar} />}
-      {movimientos === null && !errorDeCarga && <p className="text-lg text-tinta-suave">Cargando...</p>}
-      {movimientos?.length === 0 && (
-        <p className="text-lg text-tinta-suave">No hay movimientos en los últimos {DIAS_DE_HISTORIAL} días.</p>
-      )}
+      {cargados === null && !errorDeCarga && <p className="text-lg text-tinta-suave">Cargando...</p>}
 
-      {movimientos && movimientos.length > 0 && (
-        <>
-          <p className="-mb-3 text-lg text-tinta-suave">Toca uno para cambiarlo.</p>
-          <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
-            {movimientos.map((m) => {
-              const esPago = m.tabla === 'pagos'
-              const contenido = (
-                <>
-                  <div className={`min-w-0 flex-1 ${m.anulado ? 'text-tinta-tenue line-through' : ''}`}>
-                    {/* El día va primero y grande: así se busca en el historial. */}
-                    <p className="text-lg font-semibold">{fechaCorta(m.fecha)}</p>
-                    <p
-                      className={`text-base ${esPago && !m.anulado ? 'font-semibold text-exito' : m.anulado ? '' : 'text-tinta-suave'}`}
-                    >
-                      {m.texto}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-lg font-semibold tabular-nums ${
-                      m.anulado ? 'text-tinta-tenue line-through' : esPago ? 'text-exito' : ''
-                    }`}
-                  >
-                    {esPago ? '−' : ''}
-                    {formatearPesos(m.valor)}
+      {cargados && (
+        <div className="flex flex-col gap-4">
+          {grupos.length === 0 ? (
+            <p className="text-lg text-tinta-suave">No hay compras ni pagos desde el {fechaLarga(cargados.desde)}.</p>
+          ) : (
+            <p className="-mb-2 text-lg text-tinta-suave">Toca una compra o un pago para cambiarlo.</p>
+          )}
+          {grupos.map((g) => {
+            const compro = suma(g.lista, 'compras')
+            const pago = suma(g.lista, 'pagos')
+            return (
+              <div key={g.quincena.desde} className="flex flex-col gap-2">
+                <Subtitulo className="flex flex-wrap items-baseline justify-between gap-x-4 text-lg font-semibold">
+                  <span>Del {nombreDeQuincena(g.quincena)}</span>
+                  <span className="text-lg font-normal text-tinta-suave tabular-nums">
+                    {[compro > 0 && `Compró ${formatearPesos(compro)}`, pago > 0 && `Pagó ${formatearPesos(pago)}`]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
-                </>
-              )
-              const clasesRenglon = 'flex min-w-0 flex-1 items-center gap-3 py-2 pl-4 text-left'
-              return (
-                <li key={m.clave}>
-                  <div className="flex items-center gap-3 pr-3">
-                    {/* Lo anulado no se corrige: primero se recupera con Deshacer. */}
-                    {m.anulado ? (
-                      <div className={clasesRenglon}>{contenido}</div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConfirmando(null)
-                          setEditando(editando === m.clave ? null : m.clave)
-                        }}
-                        aria-expanded={editando === m.clave}
-                        className={`${clasesRenglon} active:bg-hundido`}
-                      >
-                        {contenido}
-                      </button>
-                    )}
-                    {m.anulado ? (
-                      <span className="w-24 text-center text-base text-tinta-suave">Anulado</span>
-                    ) : (
-                      <Boton
-                        variante="secundario"
-                        compacto
-                        className="w-24"
-                        aria-label={`Anular: ${m.texto}, ${fechaCorta(m.fecha)}, ${formatearPesos(m.valor)}`}
-                        disabled={confirmando === m.clave}
-                        onClick={() => {
-                          setEditando(null)
-                          setConfirmando(m.clave)
-                        }}
-                      >
-                        Anular
-                      </Boton>
-                    )}
-                  </div>
-                  {confirmando === m.clave && (
-                    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
-                      <span className="mr-auto text-lg">¿Anular {esPago ? 'este pago' : 'esta compra'}?</span>
-                      <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
-                        No
-                      </Boton>
-                      <Boton variante="peligro" compacto onClick={() => anular(m)}>
-                        Sí, anular
-                      </Boton>
-                    </div>
-                  )}
-                  {editando === m.clave && (
-                    <Editar
-                      movimiento={m}
-                      persona={{ id: s.persona_id, nombre: s.nombre, departamento: s.departamento }}
-                      onCancelar={() => setEditando(null)}
-                      onGuardar={(correccion) => corregir(m, correccion)}
-                    />
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </>
+                </Subtitulo>
+                <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
+                  {g.lista.map(renglon)}
+                </ul>
+              </div>
+            )
+          })}
+          {anterior !== null && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-hundido px-4 py-3">
+              <p className="mr-auto text-lg">
+                Antes del {fechaLarga(cargados.desde)}:{' '}
+                <span className="font-semibold tabular-nums">
+                  {anterior > 0
+                    ? `debía ${formatearPesos(anterior)}`
+                    : anterior < 0
+                      ? `tenía ${formatearPesos(-anterior)} a favor`
+                      : 'estaba al día'}
+                </span>
+              </p>
+              <Boton
+                variante="secundario"
+                compacto
+                disabled={trayendoMas}
+                onClick={() => setQuincenas((antes) => antes + QUINCENAS_POR_VEZ)}
+              >
+                {trayendoMas ? 'Cargando...' : 'Ver más atrás'}
+              </Boton>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Una archivada ya no se une: se unió antes o ya no compra. */}
-      {!s.activo ? null : uniendo === null ? (
-        <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setUniendo('buscar')}>
-          ¿Está repetida? Unir con otra persona
-        </Boton>
-      ) : uniendo === 'buscar' ? (
-        <div className="flex flex-col gap-3 rounded-xl bg-hundido p-4">
-          <p className="text-lg font-semibold">¿Con quién se une {s.nombre}?</p>
-          <BuscarPersona
-            excluir={s.persona_id}
-            sugerirPara={s.nombre}
-            textoCancelar="Cancelar"
-            onElegir={setUniendo}
-            onCancelar={() => setUniendo(null)}
-          />
-        </div>
-      ) : (
-        <div role="alert" className="flex flex-col gap-3 rounded-xl bg-aviso-suave p-4">
-          <p className="text-xl font-semibold">
-            ¿Unir a {s.nombre} con {uniendo.nombre} · {uniendo.departamento}?
-          </p>
-          <p className="text-lg">
-            Todo lo de {s.nombre}
-            {s.saldo !== 0 && ` (${aFavor ? 'a favor' : 'debe'} ${formatearPesos(Math.abs(s.saldo))})`} pasa a{' '}
-            {uniendo.nombre}, y {s.nombre} se archiva. No se puede deshacer.
-          </p>
-          <div className="flex flex-wrap justify-end gap-3">
-            <Boton variante="secundario" compacto onClick={() => setUniendo(null)} disabled={uniendoAhora}>
-              No
-            </Boton>
-            <Boton compacto onClick={() => unir(uniendo)} disabled={uniendoAhora}>
-              {uniendoAhora ? 'Uniendo...' : 'Sí, unir'}
-            </Boton>
-          </div>
-        </div>
-      )}
+      <DatosDePersona saldo={s} enPanel={enPanel} mostrar={mostrar} onCambio={onCambio} onUnida={onUnida} />
     </section>
   )
 }
 
-function CambiarNombre({
-  nombre: actual,
-  onCancelar,
-  onGuardar,
-}: {
-  nombre: string
-  onCancelar: () => void
-  onGuardar: (nombre: string) => Promise<boolean>
-}) {
-  const [nombre, setNombre] = useState(actual)
-  const [guardando, setGuardando] = useState(false)
-  const limpio = nombre.trim().replace(/\s+/g, ' ')
-  const listo = limpio !== '' && limpio !== actual
-
-  async function guardar(e: FormEvent) {
-    e.preventDefault()
-    if (!listo || guardando) return
-    setGuardando(true)
-    // Si salió bien, este formulario se cierra solo.
-    if (!(await onGuardar(limpio))) setGuardando(false)
-  }
-
-  return (
-    <form onSubmit={guardar} className="flex w-full flex-col gap-3">
-      <label className="flex flex-col gap-2">
-        <span className="text-base font-semibold text-tinta-suave">Nombre</span>
-        <input
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          autoComplete="off"
-          autoCapitalize="words"
-          autoFocus
-          enterKeyHint="done"
-          className={`${campo} text-xl`}
-        />
-      </label>
-      <div className="flex flex-wrap justify-end gap-3">
-        <Boton variante="secundario" compacto onClick={onCancelar}>
-          Cancelar
-        </Boton>
-        <Boton type="submit" compacto className="min-w-32" disabled={!listo || guardando}>
-          {guardando ? 'Guardando...' : 'Guardar'}
-        </Boton>
-      </div>
-    </form>
-  )
-}
-
-/** Anotar otra compra a esta persona sin volver a Registrar. */
 function AgregarCompra({
   nombre,
   dia,
@@ -825,124 +744,5 @@ function Editar({
         </Boton>
       </div>
     </form>
-  )
-}
-
-/** Buscar a quién pasarle una compra o un pago: por nombre, o nombre y departamento. */
-function BuscarPersona({
-  excluir,
-  sugerirPara,
-  textoCancelar = 'Dejarlo en la misma persona',
-  onElegir,
-  onCancelar,
-}: {
-  /** La persona que no se ofrece: con quien se está. */
-  excluir?: number
-  /** Sin escribir nada, se ofrecen las que suenan como este nombre. */
-  sugerirPara?: string
-  textoCancelar?: string
-  onElegir: (q: Quien) => void
-  onCancelar: () => void
-}) {
-  const [personas, setPersonas] = useState<Quien[] | null>(null)
-  const [errorDeCarga, setErrorDeCarga] = useState(false)
-  const [busqueda, setBusqueda] = useState('')
-
-  const cargar = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('personas')
-      .select('id, nombre, departamentos(nombre)')
-      .eq('activo', true)
-    if (error) {
-      setErrorDeCarga(true)
-      return
-    }
-    setErrorDeCarga(false)
-    setPersonas(
-      (data as unknown as { id: number; nombre: string; departamentos: { nombre: string } | null }[]).map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        departamento: p.departamentos?.nombre ?? '',
-      })),
-    )
-  }, [])
-
-  useEffect(() => {
-    cargar()
-  }, [cargar])
-
-  const palabras = normalizarNombre(busqueda).split(' ').filter(Boolean)
-  const encontradas =
-    personas === null || palabras.length === 0
-      ? []
-      : personas
-          .filter((p) => {
-            if (p.id === excluir) return false
-            const donde = normalizarNombre(`${p.nombre} ${p.departamento}`)
-            return palabras.every((palabra) => donde.includes(palabra))
-          })
-          .sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
-  const MAXIMO = 8
-  const primerNombre = (nombre: string) => normalizarNombre(nombre).split(' ')[0] ?? ''
-  const sugeridas =
-    personas === null || !sugerirPara
-      ? []
-      : personas
-          .filter((p) => p.id !== excluir && suenanParecido(primerNombre(sugerirPara), primerNombre(p.nombre)))
-          .sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
-
-  const boton = (p: Quien) => (
-    <button
-      key={p.id}
-      type="button"
-      onClick={() => onElegir(p)}
-      className="min-h-14 rounded-xl border border-control bg-superficie px-4 text-left text-xl active:bg-hundido"
-    >
-      <span className="font-semibold">{p.nombre}</span>{' '}
-      <span className="font-semibold text-tinta-suave">· {p.departamento}</span>
-    </button>
-  )
-
-  return (
-    <div className="flex flex-col gap-2">
-      <label className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-tinta-suave">Buscar por nombre</span>
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          autoComplete="off"
-          autoCapitalize="words"
-          autoFocus
-          className={campo}
-        />
-      </label>
-      {errorDeCarga ? (
-        <ErrorDeCarga texto="No se pudo cargar las personas." onReintentar={cargar} />
-      ) : personas === null ? (
-        <p className="text-lg text-tinta-suave">Cargando...</p>
-      ) : palabras.length === 0 && sugeridas.length > 0 ? (
-        <>
-          <p className="text-lg text-tinta-suave">Suenan parecido:</p>
-          {sugeridas.slice(0, MAXIMO).map(boton)}
-          <p className="text-lg text-tinta-suave">¿No es ninguna? Escribe el nombre.</p>
-        </>
-      ) : palabras.length === 0 ? (
-        <p className="text-lg text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
-      ) : encontradas.length === 0 ? (
-        <p className="text-lg text-tinta-suave">No hay nadie con ese nombre.</p>
-      ) : (
-        <>
-          {encontradas.slice(0, MAXIMO).map(boton)}
-          {encontradas.length > MAXIMO && (
-            <p className="text-lg text-tinta-suave">
-              Hay {encontradas.length - MAXIMO} más. Escribe más del nombre o el departamento.
-            </p>
-          )}
-        </>
-      )}
-      <Boton variante="secundario" compacto className="self-start" onClick={onCancelar}>
-        {textoCancelar}
-      </Boton>
-    </div>
   )
 }

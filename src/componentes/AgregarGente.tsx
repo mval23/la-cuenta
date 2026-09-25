@@ -1,9 +1,10 @@
 // Agregar personas a un departamento y departamentos nuevos, desde Cobrar.
-// Cambiar nombres, mover de departamento o archivar sigue en Ajustes.
+// Cambiar nombre o departamento y archivar se hace en el detalle de la persona.
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Boton } from './Boton'
 import { campo } from './estilos'
+import { MensajeDeError } from './MensajeDeError'
 import { Microfono } from './Microfono'
 import { Parecidas } from './Parecidas'
 import type { DatosAviso } from './useAviso'
@@ -37,6 +38,9 @@ export function AgregarPersona({
   const [guardando, setGuardando] = useState(false)
   // "Cerrar" con un nombre escrito: se pregunta antes de perderlo.
   const [preguntando, setPreguntando] = useState(false)
+  // Un nombre repetido se avisa debajo del campo, donde se corrige.
+  const [error, setError] = useState<string | null>(null)
+  const idError = useId()
   const entrada = useRef<HTMLInputElement>(null)
   const conMicrofono = hayMicrofono()
 
@@ -61,13 +65,10 @@ export function AgregarPersona({
       .single()
     setGuardando(false)
     if (error) {
-      mostrar({
-        tipo: 'error',
-        texto:
-          error.code === '23505'
-            ? `Ya hay una persona llamada ${limpio} en ${departamento.nombre}.`
-            : 'No se pudo guardar. Revisa el internet e intenta otra vez.',
-      })
+      if (error.code === '23505') {
+        setPreguntando(false)
+        setError(`Ya hay una persona llamada ${limpio} en ${departamento.nombre}.`)
+      } else mostrar({ tipo: 'error', texto: 'No se pudo guardar. Revisa el internet e intenta otra vez.' })
       return false
     }
     // Se queda abierto: casi siempre se agregan varias del mismo departamento.
@@ -94,7 +95,10 @@ export function AgregarPersona({
           onTexto={(dicho) => setNombre(nombreDictado(dicho))}
           onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
           sinVoz="Puedes escribir el nombre en el campo de abajo."
-          onEmpezar={() => setNombre('')}
+          onEmpezar={() => {
+            setError(null)
+            setNombre('')
+          }}
         />
       )}
       <label htmlFor={`nueva-${departamento.id}`} className="text-base text-tinta-suave">
@@ -107,8 +111,11 @@ export function AgregarPersona({
           value={nombre}
           onChange={(e) => {
             setPreguntando(false)
+            setError(null)
             setNombre(e.target.value)
           }}
+          aria-invalid={error !== null}
+          aria-describedby={error ? idError : undefined}
           placeholder="Nombre y apellido"
           autoComplete="off"
           autoCapitalize="words"
@@ -124,6 +131,7 @@ export function AgregarPersona({
           </Boton>
         )}
       </div>
+      {error && <MensajeDeError id={idError} texto={error} />}
       {preguntando && (
         <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
           <span className="mr-auto text-lg">
@@ -157,6 +165,8 @@ export function NuevoDepartamento({
 }) {
   const [abierto, setAbierto] = useState(false)
   const [nombre, setNombre] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const idError = useId()
 
   async function agregar(e: FormEvent) {
     e.preventDefault()
@@ -164,13 +174,8 @@ export function NuevoDepartamento({
     if (!limpio) return
     const { error } = await supabase.from('departamentos').insert({ nombre: limpio })
     if (error) {
-      mostrar({
-        tipo: 'error',
-        texto:
-          error.code === '23505'
-            ? 'Ya existe un departamento con ese nombre.'
-            : 'No se pudo guardar. Revisa el internet e intenta otra vez.',
-      })
+      if (error.code === '23505') setError(`Ya existe un departamento llamado ${limpio}.`)
+      else mostrar({ tipo: 'error', texto: 'No se pudo guardar. Revisa el internet e intenta otra vez.' })
       return
     }
     setNombre('')
@@ -188,23 +193,37 @@ export function NuevoDepartamento({
   }
 
   return (
-    <form onSubmit={agregar} className="flex flex-wrap items-end gap-3 rounded-xl border border-linea bg-superficie p-4">
-      <label className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-        <span className="text-base font-semibold text-tinta-suave">Nombre del departamento nuevo</span>
-        <input
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          autoComplete="off"
-          autoFocus
-          className={campo}
-        />
-      </label>
-      <Boton type="submit" disabled={!nombre.trim()}>
-        Agregar
-      </Boton>
-      <Boton variante="secundario" onClick={() => setAbierto(false)}>
-        Cancelar
-      </Boton>
+    <form onSubmit={agregar} className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <span className="text-base font-semibold text-tinta-suave">Nombre del departamento nuevo</span>
+          <input
+            value={nombre}
+            onChange={(e) => {
+              setError(null)
+              setNombre(e.target.value)
+            }}
+            autoComplete="off"
+            autoFocus
+            aria-invalid={error !== null}
+            aria-describedby={error ? idError : undefined}
+            className={campo}
+          />
+        </label>
+        <Boton type="submit" disabled={!nombre.trim()}>
+          Agregar
+        </Boton>
+        <Boton
+          variante="secundario"
+          onClick={() => {
+            setError(null)
+            setAbierto(false)
+          }}
+        >
+          Cancelar
+        </Boton>
+      </div>
+      {error && <MensajeDeError id={idError} texto={error} />}
     </form>
   )
 }

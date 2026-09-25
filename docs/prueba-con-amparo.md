@@ -32,10 +32,11 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 | 5 | "Empieza a anotar 10 mil para Carlos Pérez. Antes de guardar, alguien viene a pagar: ve a Cobrar, anota que Carlos Gómez abonó 5 mil y vuelve a terminar la compra." | Al volver a Registrar la tarjeta sigue ahí, con Carlos Pérez y $10.000. | ¿Encuentra la tarjeta al volver? ¿Cree que ya se había guardado? |
 | 6 | "Te equivocaste en la última compra: bórrala." | Toca Anular en la lista de Hoy y confirma, o usa Deshacer. | ¿Encuentra Anular? ¿Alcanza a ver el aviso de abajo? |
 | 7 | "Carlos Pérez te pagó todo. Anótalo." | Va a Cobrar, lo encuentra y toca Pagó todo, luego Sí, pagó. | ¿Usa el buscador o baja por la lista? ¿Ve el aviso? |
-| 8 | "¿Cuánto debe Carlos Gómez y qué compró? Si te paga ahora, anótalo." | Toca su nombre, lee el historial y toca Pagó todo ahí mismo. | ¿Explica el saldo con lo que ve? ¿Paga desde el detalle o vuelve a la lista? ¿Sabe volver? |
-| 9 | "Agrega a una persona nueva, Luisa Rojas, en Prueba." | En Cobrar toca + Persona en Prueba, dice o escribe el nombre y toca Agregar. | ¿Toca Cerrar sin agregar? ¿Entiende la pregunta que aparece? |
-| 10 | "Haz el PDF de esta quincena." | En Cobrar toca PDF de la quincena y luego Hacer el PDF y compartir. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
+| 8 | "¿Cuánto debe Carlos Gómez y qué compró? Si te paga ahora, anótalo." | Toca su nombre, lee el historial por quincena y toca Pagó todo ahí mismo. | ¿Explica el saldo con lo que ve (y con "Antes del…" si viene de atrás)? ¿Paga desde el detalle o vuelve a la lista? ¿Sabe volver? |
+| 9 | "Agrega a una persona nueva, Luisa Rojas, en Prueba." | En Cobrar, al final de la lista de Prueba, toca Agregar persona a Prueba, dice o escribe el nombre y toca Agregar. | ¿Toca Cerrar sin agregar? ¿Entiende la pregunta que aparece? |
+| 10 | "Haz el PDF de esta quincena." | En Cobrar baja hasta Documentos de la quincena, toca PDF de la quincena y luego Hacer el PDF y compartir. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
 | 11 | "Gira el iPad y anota otra compra." | Se ve igual, en una columna; el botón Guardar se ve con el teclado abierto. | ¿Se desorienta al girar? |
+| 12 | "Luisa Rojas se pasó a otro departamento. Cámbiala." | Busca a Luisa, abre su detalle, baja a Datos de Luisa Rojas y toca Cambiar departamento. | ¿Busca esto en Ajustes o en el detalle? ¿Encuentra la sección de abajo? |
 
 ## Preguntas al final
 
@@ -54,7 +55,7 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 
 ## Cuándo va bien
 
-- Termina 10 de las 11 tareas sin ayuda.
+- Termina 11 de las 12 tareas sin ayuda.
 - En la tarea 5 no pierde la compra.
 - En la tarea 8 explica el saldo sin sumar de memoria.
 - Califica su confianza en 4 o más.

@@ -3,6 +3,7 @@ import {
   fechaDeDocumento,
   fechaDeTabla,
   hoyBogota,
+  inicioDeQuincenas,
   nombreDeQuincena,
   nombreDelMes,
   quincenaDe,
@@ -51,6 +52,13 @@ describe('quincenas', () => {
     const q = quincenaDe('2026-01-10')
     expect(quincenaVecina(q, -1)).toEqual({ desde: '2025-12-16', hasta: '2025-12-31' })
     expect(quincenaVecina(q, 1)).toEqual({ desde: '2026-01-16', hasta: '2026-01-31' })
+  })
+
+  it('encuentra dónde empiezan las últimas quincenas', () => {
+    expect(inicioDeQuincenas('2026-09-24', 1)).toBe('2026-09-16')
+    expect(inicioDeQuincenas('2026-09-24', 2)).toBe('2026-09-01')
+    expect(inicioDeQuincenas('2026-09-24', 6)).toBe('2026-07-01')
+    expect(inicioDeQuincenas('2026-02-03', 4)).toBe('2025-12-16')
   })
 
   it('se nombra con sus días', () => {
