@@ -16,9 +16,16 @@ const titulos: Record<Seccion, string> = {
   departamentos: 'Departamentos',
 }
 
-export function Ajustes({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
+export function Ajustes({ perfil, activa, inicio }: { perfil: Perfil; activa: boolean; inicio: number }) {
   const { aviso, mostrar, cerrar } = useAviso()
   const [seccion, setSeccion] = useState<Seccion>('inicio')
+
+  // Tocar la pestaña Ajustes estando en ella vuelve al menú.
+  const [inicioVisto, setInicioVisto] = useState(inicio)
+  if (inicio !== inicioVisto) {
+    setInicioVisto(inicio)
+    setSeccion('inicio')
+  }
 
   // Cada sección abre desde arriba.
   useLayoutEffect(() => {
@@ -111,7 +118,11 @@ function Inicio({
         {saliendo ? (
           // Para volver a entrar hay que configurar el dispositivo otra vez: mejor preguntar antes.
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
-            <span className="mr-auto text-lg">¿Cerrar sesión? Para volver a entrar hay que configurar este dispositivo otra vez con la contraseña de la cuenta.</span>
+            <span className="mr-auto text-lg">
+              {perfil.rol === 'admin'
+                ? '¿Cerrar sesión? Para volver a entrar hay que configurar este dispositivo otra vez con la contraseña de la cuenta.'
+                : '¿Cerrar sesión? Para volver a entrar vas a necesitar a Mariana, que tiene la contraseña de la cuenta.'}
+            </span>
             <Boton variante="secundario" compacto onClick={() => setSaliendo(false)}>
               No
             </Boton>

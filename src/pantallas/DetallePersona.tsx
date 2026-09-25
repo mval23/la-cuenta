@@ -4,7 +4,9 @@ import { Boton } from '../componentes/Boton'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
+import { PanelDePago } from '../componentes/Pago'
 import { hoyBogota } from '../lib/fechas'
+import type { TipoDePago } from '../lib/pagos'
 import { normalizarNombre, suenanParecido } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
@@ -78,6 +80,7 @@ export function DetallePersona({
   diaParaAgregar,
   onVolver,
   onCambio,
+  onPago,
   onUnida,
   mostrar,
 }: {
@@ -93,6 +96,11 @@ export function DetallePersona({
   diaParaAgregar?: string
   onVolver: () => void
   onCambio: () => Promise<void>
+  /**
+   * Registrar que pagó o abonó sin volver a la lista: en el iPad de Amparo el
+   * detalle tapa la lista. Devuelve si se guardó.
+   */
+  onPago: (valor: number, tipo: TipoDePago) => Promise<boolean>
   /** Tras unirla con otra persona (que queda archivada): abrir la otra. */
   onUnida: (personaId: number) => Promise<void>
   mostrar: (aviso: DatosAviso) => void
@@ -103,6 +111,7 @@ export function DetallePersona({
   const [editando, setEditando] = useState<string | null>(null)
   const [renombrando, setRenombrando] = useState(false)
   const [agregando, setAgregando] = useState(false)
+  const [pagando, setPagando] = useState<TipoDePago | null>(null)
   // Unir con otra persona: primero se busca con quién, después se confirma.
   const [uniendo, setUniendo] = useState<'buscar' | Quien | null>(null)
   const [uniendoAhora, setUniendoAhora] = useState(false)
@@ -161,11 +170,11 @@ export function DetallePersona({
     )
   }, [s.persona_id])
 
-  // También cuando cambia el saldo: en horizontal se puede pagar desde la lista
-  // con el historial abierto al lado.
+  // También cada vez que la pantalla de afuera vuelve a traer el saldo: se pudo
+  // pagar desde la lista, o anotar algo en otra pestaña.
   useEffect(() => {
     cargar()
-  }, [cargar, s.saldo])
+  }, [cargar, s])
 
   async function cambiarAnulado(m: Movimiento, anulado: boolean): Promise<boolean> {
     const { error } = await supabase.from(m.tabla).update(anulacion(m.tabla, anulado)).eq('id', m.id)
@@ -308,6 +317,14 @@ export function DetallePersona({
     await onUnida(destino.id)
   }
 
+  /** Abre un formulario de arriba y cierra lo que estuviera abierto en la lista. */
+  function abrir(cual: () => void) {
+    setEditando(null)
+    setConfirmando(null)
+    cual()
+  }
+
+  const puedeAgregar = diaParaAgregar !== undefined && s.activo
   const aFavor = s.saldo < 0
   const Titulo = enPanel ? 'h2' : 'h1'
 
@@ -366,33 +383,50 @@ export function DetallePersona({
         </p>
       </div>
 
-      {/* Una archivada ya no compra. */}
-      {diaParaAgregar &&
-        s.activo &&
-        !renombrando &&
-        (agregando ? (
-          <AgregarCompra
-            nombre={s.nombre}
-            dia={diaParaAgregar}
-            onCancelar={() => setAgregando(false)}
-            onGuardar={agregar}
-          />
-        ) : (
-          <Boton
-            variante="tintado"
-            className="self-start"
-            onClick={() => {
-              setEditando(null)
-              setConfirmando(null)
-              setAgregando(true)
-            }}
-          >
-            <span aria-hidden="true" className="mr-1 text-2xl leading-none">
-              +
-            </span>
-            Otra compra
-          </Boton>
-        ))}
+      {/* Cobrarle aquí mismo; una archivada que debe también puede pagar, pero ya no compra.
+          Desde Registrar lo principal es anotar otra compra; desde Cobrar, el pago. */}
+      {!renombrando && pagando === null && !agregando && (s.saldo > 0 || puedeAgregar) && (
+        <div className="flex flex-wrap gap-3">
+          {puedeAgregar && (
+            <Boton variante="tintado" onClick={() => abrir(() => setAgregando(true))}>
+              <span aria-hidden="true" className="mr-1 text-2xl leading-none">
+                +
+              </span>
+              Otra compra
+            </Boton>
+          )}
+          {s.saldo > 0 && (
+            <>
+              <Boton
+                variante={puedeAgregar ? 'secundario' : 'tintado'}
+                onClick={() => abrir(() => setPagando('total'))}
+              >
+                Pagó todo
+              </Boton>
+              <Boton variante="secundario" onClick={() => abrir(() => setPagando('abono'))}>
+                Abono
+              </Boton>
+            </>
+          )}
+        </div>
+      )}
+      {pagando !== null && (
+        <PanelDePago
+          saldo={s}
+          tipo={pagando}
+          onPago={onPago}
+          onCerrar={() => setPagando(null)}
+          className="rounded-xl"
+        />
+      )}
+      {agregando && diaParaAgregar && (
+        <AgregarCompra
+          nombre={s.nombre}
+          dia={diaParaAgregar}
+          onCancelar={() => setAgregando(false)}
+          onGuardar={agregar}
+        />
+      )}
 
       {errorDeCarga && <ErrorDeCarga texto="No se pudo cargar el historial." onReintentar={cargar} />}
       {movimientos === null && !errorDeCarga && <p className="text-lg text-tinta-suave">Cargando...</p>}

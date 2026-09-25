@@ -45,7 +45,8 @@ export function Login() {
       <form onSubmit={entrar} className="flex flex-col gap-4">
         {bloqueado && (
           <p className="rounded-xl bg-aviso-suave p-4 text-lg" role="status">
-            Se cerró la sesión porque el PIN se escribió mal muchas veces.
+            Se cerró la sesión porque el PIN se escribió mal muchas veces. Para volver a entrar hace falta la
+            contraseña de la cuenta: la tiene Mariana.
           </p>
         )}
         <p className="text-lg">
