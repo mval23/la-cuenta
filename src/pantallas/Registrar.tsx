@@ -9,6 +9,7 @@ import { Microfono } from '../componentes/Microfono'
 import { Parecidas } from '../componentes/Parecidas'
 import { leerDictado } from '../lib/dictado'
 import { DIAS_ATRAS_PERMITIDOS, fechaLarga, hora, hoyBogota, nombreDelDia } from '../lib/fechas'
+import { guardarPago } from '../lib/pagos'
 import { normalizarNombre, vocabulario } from '../lib/personas'
 import { formatearPesos, valorInusual } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
@@ -52,7 +53,7 @@ function sufijoDelDia(fecha: string, hoy: string): string {
   return fecha === hoy ? '' : ` (${nombreDelDia(fecha, hoy).toLowerCase()})`
 }
 
-export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
+export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boolean; inicio: number }) {
   const [departamentos, setDepartamentos] = useState<Departamento[] | null>(null)
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -63,6 +64,13 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   // Al tocar una compra del día se ve todo lo de esa persona, en lugar de Registrar.
   const [abierta, setAbierta] = useState<Saldo | null>(null)
   const posicionDeRegistrar = useRef(0)
+  // Tocar la pestaña Registrar estando en ella cierra el historial abierto. La
+  // compra a medio anotar se queda: solo se descarta con Cancelar.
+  const [inicioVisto, setInicioVisto] = useState(inicio)
+  if (inicio !== inicioVisto) {
+    setInicioVisto(inicio)
+    setAbierta(null)
+  }
   // Con el día al que pertenecen: al cambiar de día no se muestran las del anterior.
   const [comprasCargadas, setComprasCargadas] = useState<{ dia: string; lista: CompraDelDia[] } | null>(null)
   const { aviso, mostrar, cerrar } = useAviso()
@@ -135,6 +143,17 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
   useEffect(() => {
     if (activa) cargarCompras()
   }, [activa, cargarCompras])
+
+  // Si se volvió con el historial de alguien abierto, su saldo pudo cambiar en Cobrar.
+  const estabaActiva = useRef(activa)
+  useEffect(() => {
+    const volvio = activa && !estabaActiva.current
+    estabaActiva.current = activa
+    if (!volvio || !abierta) return
+    cargarSaldo(abierta.persona_id).then((saldo) => {
+      if (saldo) setAbierta(saldo)
+    })
+  }, [activa, abierta])
 
   // El historial abre desde arriba; al volver, Registrar queda donde estaba.
   const hayAbierta = abierta !== null
@@ -323,6 +342,10 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
           diaParaAgregar={dia}
           onVolver={() => setAbierta(null)}
           onCambio={alCambiarDetalle}
+          onPago={(valor, tipo) => {
+            cerrar()
+            return guardarPago({ saldo: abierta, valor, tipo, mostrar, recargar: alCambiarDetalle })
+          }}
           onUnida={async (id) => {
             const [saldo] = await Promise.all([cargarSaldo(id), cargarCompras(), cargarPersonas()])
             setAbierta(saldo)
@@ -369,6 +392,7 @@ export function Registrar({ perfil, activa }: { perfil: Perfil; activa: boolean 
                 vocabulario={() => vocabulario(personas, departamentos, comprasRecientes)}
                 onTexto={leer}
                 onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+                sinVoz="Toca «Anotar a mano» para anotarla sin hablar."
                 onEmpezar={cerrar}
               />
             )}

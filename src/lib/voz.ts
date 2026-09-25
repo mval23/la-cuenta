@@ -128,9 +128,10 @@ export async function transcribir(audio: Blob, vocabulario: string): Promise<str
     body: formulario,
   }).catch(() => null)
 
-  if (!r) throw new ErrorDeVoz('Sin conexión. Revisa el internet o escribe la frase.')
-  if (r.status === 429) throw new ErrorDeVoz('Se usó mucho la voz por hoy. Escribe la frase.')
-  if (!r.ok) throw new ErrorDeVoz('No se pudo entender el audio. Intenta de nuevo o escribe la frase.')
+  // Qué hacer en lugar de hablar lo agrega cada pantalla (ver `sinVoz` en Microfono).
+  if (!r) throw new ErrorDeVoz('Sin conexión. Revisa el internet.')
+  if (r.status === 429) throw new ErrorDeVoz('Se usó mucho la voz por hoy.')
+  if (!r.ok) throw new ErrorDeVoz('No se pudo entender el audio. Intenta de nuevo.')
   const { texto } = (await r.json()) as { texto: string }
   return texto
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AgregarPersona, NuevoDepartamento } from '../componentes/AgregarGente'
 import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
@@ -6,7 +6,9 @@ import { usePantallaAncha } from '../componentes/usePantallaAncha'
 import { Boton } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
+import { PanelDePago } from '../componentes/Pago'
 import { agruparParaCobro, type GrupoDeCobro } from '../lib/cobro'
+import { guardarPago, type TipoDePago } from '../lib/pagos'
 import { normalizarNombre } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
@@ -17,7 +19,7 @@ import { PdfQuincena } from './PdfQuincena'
 
 type Vista = 'lista' | 'quincena' | 'cuentaDeCobro'
 
-export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) {
+export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boolean; inicio: number }) {
   const [saldos, setSaldos] = useState<Saldo[] | null>(null)
   // Los activos, también los que no tienen a nadie debiendo: ahí se agregan personas.
   const [departamentos, setDepartamentos] = useState<{ id: number; nombre: string }[]>([])
@@ -34,6 +36,16 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
   const posicionDeLista = useRef(0)
   // En horizontal, la lista y el historial van lado a lado.
   const ancha = usePantallaAncha()
+
+  // Tocar la pestaña Cobrar estando en ella: de vuelta a la lista completa.
+  // Lo que se estaba escribiendo (un abono, una persona nueva) se queda.
+  const [inicioVisto, setInicioVisto] = useState(inicio)
+  if (inicio !== inicioVisto) {
+    setInicioVisto(inicio)
+    setAbierta(null)
+    setVista('lista')
+    setBusqueda('')
+  }
 
   const cargar = useCallback(async () => {
     const [{ data, error }, d] = await Promise.all([
@@ -89,30 +101,16 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
     })
   }
 
-  async function registrarPago(s: Saldo, valor: number, tipo: 'total' | 'abono') {
+  function registrarPago(s: Saldo, valor: number, tipo: TipoDePago) {
     cerrar()
-    const { data, error } = await supabase
-      .from('pagos')
-      .insert({ persona_id: s.persona_id, valor_pesos: valor, tipo })
-      .select('id')
-      .single()
-    if (error) {
-      mostrar({ tipo: 'error', texto: 'No se pudo guardar el pago. Revisa el internet e intenta otra vez.' })
-      return false
-    }
-    setPagadas((antes) => new Set(antes).add(s.persona_id))
-    mostrar({
-      tipo: 'ok',
-      texto: `${tipo === 'total' ? 'Pago' : 'Abono'} guardado: ${s.nombre}, ${formatearPesos(valor)}`,
-      deshacer: async () => {
-        const { error } = await supabase.from('pagos').update({ anulado: true }).eq('id', data.id)
-        if (error) mostrar({ tipo: 'error', texto: 'No se pudo deshacer. Revisa el internet.' })
-        else mostrar({ tipo: 'ok', texto: `Se deshizo el ${tipo === 'total' ? 'pago' : 'abono'} de ${s.nombre}.` })
-        await cargar()
-      },
+    return guardarPago({
+      saldo: s,
+      valor,
+      tipo,
+      mostrar,
+      alGuardar: () => setPagadas((antes) => new Set(antes).add(s.persona_id)),
+      recargar: cargar,
     })
-    await cargar()
-    return true
   }
 
   const avisoFlotante = <Aviso aviso={aviso} onCerrar={cerrar} />
@@ -147,6 +145,7 @@ export function Cobrar({ perfil, activa }: { perfil: Perfil; activa: boolean }) 
       enPanel={ancha}
       onVolver={() => setAbierta(null)}
       onCambio={cargar}
+      onPago={(valor, tipo) => registrarPago(persona, valor, tipo)}
       onUnida={async (id) => {
         await cargar()
         setAbierta(id)
@@ -356,27 +355,9 @@ function FilaDeCobro({
   saldo: Saldo
   seleccionada: boolean
   onAbrir: () => void
-  onPago: (valor: number, tipo: 'total' | 'abono') => Promise<boolean>
+  onPago: (valor: number, tipo: TipoDePago) => Promise<boolean>
 }) {
-  const [modo, setModo] = useState<'nada' | 'total' | 'abono'>('nada')
-  const [abono, setAbono] = useState('')
-  const [guardando, setGuardando] = useState(false)
-  const valorAbono = Number(abono)
-
-  async function pagar(valor: number, tipo: 'total' | 'abono') {
-    setGuardando(true)
-    const ok = await onPago(valor, tipo)
-    setGuardando(false)
-    if (ok) {
-      setModo('nada')
-      setAbono('')
-    }
-  }
-
-  function guardarAbono(e: FormEvent) {
-    e.preventDefault()
-    if (valorAbono > 0 && !guardando) pagar(valorAbono, 'abono')
-  }
+  const [modo, setModo] = useState<TipoDePago | null>(null)
 
   return (
     <li>
@@ -395,62 +376,19 @@ function FilaDeCobro({
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        {modo === 'nada' && s.saldo > 0 && (
+        {modo === null && s.saldo > 0 && (
           <>
-            <Boton variante="tintado" compacto onClick={() => setModo('total')}>
+            <Boton variante="tintado" compacto aria-label={`Pagó todo: ${s.nombre}`} onClick={() => setModo('total')}>
               Pagó todo
             </Boton>
-            <Boton variante="secundario" compacto onClick={() => setModo('abono')}>
+            <Boton variante="secundario" compacto aria-label={`Abono: ${s.nombre}`} onClick={() => setModo('abono')}>
               Abono
             </Boton>
           </>
         )}
       </div>
 
-      {modo === 'total' && (
-        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-marca-suave px-4 py-3">
-          <span className="mr-auto text-lg">
-            ¿{s.nombre} pagó <span className="font-semibold tabular-nums">{formatearPesos(s.saldo)}</span>?
-          </span>
-          <Boton variante="secundario" compacto disabled={guardando} onClick={() => setModo('nada')}>
-            No
-          </Boton>
-          <Boton compacto disabled={guardando} onClick={() => pagar(s.saldo, 'total')}>
-            {guardando ? 'Guardando...' : 'Sí, pagó'}
-          </Boton>
-        </div>
-      )}
-
-      {modo === 'abono' && (
-        <form onSubmit={guardarAbono} className="flex flex-col gap-2 bg-marca-suave px-4 py-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <input
-              value={abono}
-              onChange={(e) => setAbono(e.target.value.replace(/\D/g, '').replace(/^0+/, ''))}
-              inputMode="numeric"
-              enterKeyHint="done"
-              placeholder="Cuánto abonó"
-              aria-label={`Abono de ${s.nombre}`}
-              autoFocus
-              className={`${campo} max-w-48`}
-            />
-            <span className="mr-auto text-xl font-semibold tabular-nums">
-              {valorAbono > 0 ? formatearPesos(valorAbono) : ''}
-            </span>
-            <Boton variante="secundario" compacto disabled={guardando} onClick={() => setModo('nada')}>
-              Cancelar
-            </Boton>
-            <Boton type="submit" compacto disabled={!(valorAbono > 0) || guardando}>
-              {guardando ? 'Guardando...' : 'Guardar abono'}
-            </Boton>
-          </div>
-          {valorAbono > s.saldo && (
-            <p className="text-base text-info">
-              Es más de lo que debe: quedará {formatearPesos(valorAbono - s.saldo)} a favor.
-            </p>
-          )}
-        </form>
-      )}
+      {modo !== null && <PanelDePago saldo={s} tipo={modo} onPago={onPago} onCerrar={() => setModo(null)} />}
     </li>
   )
 }

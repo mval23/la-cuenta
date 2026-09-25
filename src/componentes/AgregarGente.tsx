@@ -35,6 +35,8 @@ export function AgregarPersona({
 }) {
   const [nombre, setNombre] = useState('')
   const [guardando, setGuardando] = useState(false)
+  // "Cerrar" con un nombre escrito: se pregunta antes de perderlo.
+  const [preguntando, setPreguntando] = useState(false)
   const entrada = useRef<HTMLInputElement>(null)
   const conMicrofono = hayMicrofono()
 
@@ -43,10 +45,14 @@ export function AgregarPersona({
     if (!conMicrofono) entrada.current?.focus()
   }, [conMicrofono])
 
-  async function agregar(e: FormEvent) {
+  function agregar(e: FormEvent) {
     e.preventDefault()
+    void guardar()
+  }
+
+  async function guardar(): Promise<boolean> {
     const limpio = nombre.trim()
-    if (!limpio || guardando) return
+    if (!limpio || guardando) return false
     setGuardando(true)
     const { data, error } = await supabase
       .from('personas')
@@ -62,13 +68,19 @@ export function AgregarPersona({
             ? `Ya hay una persona llamada ${limpio} en ${departamento.nombre}.`
             : 'No se pudo guardar. Revisa el internet e intenta otra vez.',
       })
-      return
+      return false
     }
     // Se queda abierto: casi siempre se agregan varias del mismo departamento.
     setNombre('')
     mostrar({ tipo: 'ok', texto: `Se agregó a ${limpio} en ${departamento.nombre}.` })
     if (!conMicrofono) entrada.current?.focus()
     await onAgregada(data.id)
+    return true
+  }
+
+  function cerrar() {
+    if (nombre.trim()) setPreguntando(true)
+    else onCerrar()
   }
 
   return (
@@ -81,6 +93,7 @@ export function AgregarPersona({
           vocabulario={() => [departamento.nombre, ...personas.map((p) => p.nombre)].join(', ')}
           onTexto={(dicho) => setNombre(nombreDictado(dicho))}
           onError={(mensaje) => mostrar({ tipo: 'error', texto: mensaje })}
+          sinVoz="Puedes escribir el nombre en el campo de abajo."
           onEmpezar={() => setNombre('')}
         />
       )}
@@ -92,7 +105,10 @@ export function AgregarPersona({
           id={`nueva-${departamento.id}`}
           ref={entrada}
           value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
+          onChange={(e) => {
+            setPreguntando(false)
+            setNombre(e.target.value)
+          }}
           placeholder="Nombre y apellido"
           autoComplete="off"
           autoCapitalize="words"
@@ -102,10 +118,31 @@ export function AgregarPersona({
         <Boton type="submit" disabled={!nombre.trim() || guardando}>
           {guardando ? 'Agregando...' : 'Agregar'}
         </Boton>
-        <Boton variante="secundario" onClick={onCerrar}>
-          Listo
-        </Boton>
+        {!preguntando && (
+          <Boton variante="secundario" onClick={cerrar}>
+            Cerrar
+          </Boton>
+        )}
       </div>
+      {preguntando && (
+        <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
+          <span className="mr-auto text-lg">
+            ¿Agregar a <span className="font-semibold">{nombre.trim()}</span> antes de cerrar?
+          </span>
+          <Boton variante="secundario" compacto disabled={guardando} onClick={onCerrar}>
+            No, cerrar
+          </Boton>
+          <Boton
+            compacto
+            disabled={guardando}
+            onClick={async () => {
+              if (await guardar()) onCerrar()
+            }}
+          >
+            {guardando ? 'Agregando...' : 'Sí, agregar'}
+          </Boton>
+        </div>
+      )}
       <Parecidas nombre={nombre} personas={todas} nombreDepto={nombreDepto} />
     </form>
   )

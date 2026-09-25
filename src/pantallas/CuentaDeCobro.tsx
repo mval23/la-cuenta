@@ -301,6 +301,7 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
             onEmpezar={() => undefined}
             onTexto={(texto) => void entender(texto)}
             onError={avisarError}
+            sinVoz="Puedes tocar «Prefiero escribirlo»."
           />
         )}
         {escribir ? (

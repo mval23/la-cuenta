@@ -19,6 +19,7 @@ export function Microfono({
   onTexto,
   onError,
   onEmpezar,
+  sinVoz,
   texto = 'Tocar para hablar',
   tiempos = TIEMPOS_CORTOS,
 }: {
@@ -26,6 +27,11 @@ export function Microfono({
   onTexto: (texto: string) => void
   onError: (mensaje: string) => void
   onEmpezar: () => void
+  /**
+   * Cómo seguir sin hablar en esa pantalla, con el nombre del botón que se ve,
+   * p. ej. "Toca «Anotar a mano» para anotarla sin hablar." Va al final de cada error.
+   */
+  sinVoz: string
   /** Lo que dice el botón antes de tocarlo. */
   texto?: string
   /** Cuánto puede durar y cuánto silencio indica que terminó. */
@@ -49,6 +55,8 @@ export function Microfono({
 
   if (!hayMicrofono()) return null
 
+  const fallar = (mensaje: string) => onError(`${mensaje} ${sinVoz}`)
+
   async function empezar() {
     onEmpezar()
     try {
@@ -58,7 +66,7 @@ export function Microfono({
       setAhora(momento)
       setEstado('grabando')
     } catch {
-      onError('No se pudo usar el micrófono. Revisa que La Cuenta tenga permiso en Ajustes del iPad.')
+      fallar('No se pudo usar el micrófono. Revisa que La Cuenta tenga permiso en Ajustes del iPad.')
     }
   }
 
@@ -69,7 +77,7 @@ export function Microfono({
     if (motivo === 'sin-voz') {
       actual.cancelar()
       setEstado('lista')
-      onError('No se oyó nada. Intenta de nuevo, más cerca del iPad.')
+      fallar('No se oyó nada. Intenta de nuevo, más cerca del iPad.')
       return
     }
     setEstado('procesando')
@@ -77,9 +85,9 @@ export function Microfono({
       const audio = await actual.terminar()
       const texto = await transcribir(audio, vocabulario())
       if (texto) onTexto(texto)
-      else onError('No se oyó nada. Intenta de nuevo, más cerca del iPad.')
+      else fallar('No se oyó nada. Intenta de nuevo, más cerca del iPad.')
     } catch (e) {
-      onError(e instanceof ErrorDeVoz ? e.message : 'No se pudo entender el audio. Intenta de nuevo.')
+      fallar(e instanceof ErrorDeVoz ? e.message : 'No se pudo entender el audio. Intenta de nuevo.')
     }
     setEstado('lista')
   }

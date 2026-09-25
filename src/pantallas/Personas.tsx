@@ -44,6 +44,7 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [editando, setEditando] = useState<number | null>(null)
+  const [porArchivar, setPorArchivar] = useState<number | null>(null)
 
   const cargar = useCallback(async () => {
     const [p, d, s] = await Promise.all([
@@ -72,6 +73,7 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
   }
 
   async function archivar(p: Persona) {
+    setPorArchivar(null)
     if (!(await actualizar(p.id, { activo: false }))) return
     const debe = saldos.get(p.id) ?? 0
     mostrar({
@@ -165,14 +167,46 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
                   onCancelar={() => setEditando(null)}
                 />
               ) : (
-                <li key={p.id} className="flex items-center gap-3 py-1.5 pr-3 pl-4">
-                  <span className="min-w-0 flex-1 text-lg">{p.nombre}</span>
-                  <Boton variante="secundario" compacto onClick={() => setEditando(p.id)}>
-                    Cambiar
-                  </Boton>
-                  <Boton variante="peligro" compacto onClick={() => archivar(p)}>
-                    Archivar
-                  </Boton>
+                <li key={p.id}>
+                  <div className="flex items-center gap-3 py-1.5 pr-3 pl-4">
+                    <span className="min-w-0 flex-1 text-lg">{p.nombre}</span>
+                    <Boton
+                      variante="secundario"
+                      compacto
+                      aria-label={`Cambiar: ${p.nombre}`}
+                      onClick={() => {
+                        setPorArchivar(null)
+                        setEditando(p.id)
+                      }}
+                    >
+                      Cambiar
+                    </Boton>
+                    <Boton
+                      variante="peligro"
+                      compacto
+                      aria-label={`Archivar: ${p.nombre}`}
+                      disabled={porArchivar === p.id}
+                      onClick={() => setPorArchivar(p.id)}
+                    >
+                      Archivar
+                    </Boton>
+                  </div>
+                  {porArchivar === p.id && (
+                    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
+                      <span className="mr-auto text-lg">
+                        ¿Archivar a <span className="font-semibold">{p.nombre}</span>? Ya no aparece al registrar ni al
+                        dictar.
+                        {(saldos.get(p.id) ?? 0) > 0 &&
+                          ` Lo que debe (${formatearPesos(saldos.get(p.id) ?? 0)}) sigue en Cobrar.`}
+                      </span>
+                      <Boton variante="secundario" compacto onClick={() => setPorArchivar(null)}>
+                        No
+                      </Boton>
+                      <Boton variante="peligro" compacto onClick={() => archivar(p)}>
+                        Sí, archivar
+                      </Boton>
+                    </div>
+                  )}
                 </li>
               ),
             )}

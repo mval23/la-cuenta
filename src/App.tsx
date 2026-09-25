@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Boton } from './componentes/Boton'
 import { estadoDelCandado, marcarUso, type EstadoCandado } from './lib/candado'
 import { supabase } from './lib/supabase'
@@ -60,12 +60,17 @@ export default function App() {
 function ConSesion({ usuarioId }: { usuarioId: string }) {
   const [perfil, setPerfil] = useState<Perfil | null | undefined>(undefined)
   const [pestana, setPestana] = useState<Pestana>('registrar')
-  // Al tocar una pestaña su pantalla empieza de cero: cambiar la llave la vuelve a crear.
-  const [reinicios, setReinicios] = useState<Record<Pestana, number>>({
+  // Al ir a otra pestaña y volver, todo sigue como estaba: una compra a medio
+  // anotar no se pierde si la interrumpen para cobrar. Tocar la pestaña en la
+  // que ya se está lleva al comienzo de esa pantalla (sale de un historial o de
+  // un PDF), sin borrar lo que se estaba anotando.
+  const [inicios, setInicios] = useState<Record<Pestana, number>>({
     registrar: 0,
     cobrar: 0,
     ajustes: 0,
   })
+  // Dónde iba cada pestaña, para volver al mismo punto de la lista.
+  const posiciones = useRef<Record<Pestana, number>>({ registrar: 0, cobrar: 0, ajustes: 0 })
   const [candado, setCandado] = useState<EstadoCandado>(() => estadoDelCandado(localStorage, usuarioId))
 
   // Mientras la app está a la vista no se cierra. Al volver después de un rato
@@ -95,12 +100,15 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
   }, [usuarioId])
 
   useLayoutEffect(() => {
-    window.scrollTo(0, 0)
-  }, [pestana, reinicios])
+    window.scrollTo(0, posiciones.current[pestana])
+  }, [pestana, inicios])
 
-  // También si ya se estaba en esa pestaña: sirve para salir de un historial o de un PDF.
   function cambiar(nueva: Pestana) {
-    setReinicios((antes) => ({ ...antes, [nueva]: antes[nueva] + 1 }))
+    posiciones.current[pestana] = window.scrollY
+    if (nueva === pestana) {
+      posiciones.current[nueva] = 0
+      setInicios((antes) => ({ ...antes, [nueva]: antes[nueva] + 1 }))
+    }
     setPestana(nueva)
   }
 
@@ -114,17 +122,17 @@ function ConSesion({ usuarioId }: { usuarioId: string }) {
   // El PIN tapa las pantallas sin desmontarlas: al abrirlo, todo sigue como estaba.
   return (
     <>
-    {candado === 'cerrado' && <PedirPin nombre={perfil.nombre} onAbrir={() => setCandado('abierto')} />}
+    {candado === 'cerrado' && <PedirPin nombre={perfil.nombre} esAdmin={perfil.rol === 'admin'} onAbrir={() => setCandado('abierto')} />}
     <div className="flex min-h-dvh flex-col" inert={candado === 'cerrado'}>
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-6 pb-[calc(var(--alto-pestanas)+env(safe-area-inset-bottom)+6rem)] sm:px-8 ancha:max-w-6xl ancha:px-10">
         <div hidden={pestana !== 'registrar'}>
-          <Registrar key={reinicios.registrar} perfil={perfil} activa={pestana === 'registrar'} />
+          <Registrar perfil={perfil} activa={pestana === 'registrar'} inicio={inicios.registrar} />
         </div>
         <div hidden={pestana !== 'cobrar'}>
-          <Cobrar key={reinicios.cobrar} perfil={perfil} activa={pestana === 'cobrar'} />
+          <Cobrar perfil={perfil} activa={pestana === 'cobrar'} inicio={inicios.cobrar} />
         </div>
         <div hidden={pestana !== 'ajustes'}>
-          <Ajustes key={reinicios.ajustes} perfil={perfil} activa={pestana === 'ajustes'} />
+          <Ajustes perfil={perfil} activa={pestana === 'ajustes'} inicio={inicios.ajustes} />
         </div>
       </main>
 

@@ -66,7 +66,11 @@ export function ElegirPin({ usuarioId, nombre, onListo }: { usuarioId: string; n
 }
 
 /** Tapa la app hasta que se escriba el PIN. La app sigue abierta debajo. */
-export function PedirPin({ nombre, onAbrir }: { nombre: string; onAbrir: () => void }) {
+export function PedirPin({ nombre, esAdmin, onAbrir }: { nombre: string; esAdmin: boolean; onAbrir: () => void }) {
+  // Amparo no tiene la contraseña de la cuenta: se le dice a quién acudir.
+  const configurar = esAdmin
+    ? 'configurar el iPad otra vez con la contraseña de la cuenta'
+    : 'pedirle a Mariana que configure el iPad otra vez'
   const [pin, setPin] = useState('')
   const [probando, setProbando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -93,7 +97,7 @@ export function PedirPin({ nombre, onAbrir }: { nombre: string; onAbrir: () => v
     else if (resultado.tipo === 'no') {
       setError(
         resultado.quedan <= 3
-          ? `Ese PIN no es. Si fallas ${resultado.quedan} ${resultado.quedan === 1 ? 'vez' : 'veces'} más, hay que configurar el iPad otra vez.`
+          ? `Ese PIN no es. Si fallas ${resultado.quedan} ${resultado.quedan === 1 ? 'vez' : 'veces'} más, habrá que ${configurar}.`
           : 'Ese PIN no es. Intenta otra vez.',
       )
     } else if (resultado.tipo === 'esperar') setEsperarHasta(resultado.hasta)
@@ -120,7 +124,7 @@ export function PedirPin({ nombre, onAbrir }: { nombre: string; onAbrir: () => v
           }
         />
         <p className="mt-6 text-center text-base text-tinta-suave">
-          ¿Olvidaste el PIN? Hay que configurar el iPad otra vez con la contraseña de la cuenta.
+          ¿Olvidaste el PIN? Hay que {configurar}.
         </p>
       </Marco>
     </div>

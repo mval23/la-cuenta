@@ -19,19 +19,34 @@ function aliasDesdeTexto(texto: string): string[] {
     .filter((a) => a !== '')
 }
 
+/** Qué pasa al archivar un departamento con `personas` activas. */
+function consecuencia(personas: number): string {
+  if (personas === 0) return 'Ya no aparece al registrar.'
+  const quienes = personas === 1 ? 'Su única persona deja' : `Sus ${personas} personas dejan`
+  return `${quienes} de aparecer al registrar y al dictar. Lo que deban sigue en Cobrar.`
+}
+
 export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) {
   const [lista, setLista] = useState<Departamento[] | null>(null)
   const [nuevo, setNuevo] = useState('')
   const [editando, setEditando] = useState<number | null>(null)
+  const [porArchivar, setPorArchivar] = useState<number | null>(null)
+  // Cuántas personas activas tiene cada uno: al archivarlo dejan de aparecer al registrar.
+  const [cuantas, setCuantas] = useState<ReadonlyMap<number, number>>(new Map())
   const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('departamentos')
-      .select('id, nombre, alias, activo')
-      .order('nombre')
+    const [{ data, error }, personas] = await Promise.all([
+      supabase.from('departamentos').select('id, nombre, alias, activo').order('nombre'),
+      supabase.from('personas').select('departamento_id').eq('activo', true),
+    ])
     if (error) setError('No se pudieron cargar los departamentos.')
     else setLista(data)
+    if (personas.data) {
+      const conteo = new Map<number, number>()
+      for (const { departamento_id } of personas.data) conteo.set(departamento_id, (conteo.get(departamento_id) ?? 0) + 1)
+      setCuantas(conteo)
+    }
   }, [])
 
   useEffect(() => {
@@ -62,6 +77,7 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
   }
 
   async function archivar(d: Departamento) {
+    setPorArchivar(null)
     if (!(await actualizar(d.id, { activo: false }))) return
     mostrar({
       tipo: 'ok',
@@ -115,19 +131,48 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
                 onCancelar={() => setEditando(null)}
               />
             ) : (
-              <li key={d.id} className="flex flex-wrap items-center gap-3 py-2 pr-3 pl-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-lg font-semibold">{d.nombre}</p>
-                  {d.alias.length > 0 && (
-                    <p className="text-base text-tinta-suave">También: {d.alias.join(', ')}</p>
-                  )}
+              <li key={d.id}>
+                <div className="flex flex-wrap items-center gap-3 py-2 pr-3 pl-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-lg font-semibold">{d.nombre}</p>
+                    {d.alias.length > 0 && (
+                      <p className="text-base text-tinta-suave">También: {d.alias.join(', ')}</p>
+                    )}
+                  </div>
+                  <Boton
+                    variante="secundario"
+                    compacto
+                    aria-label={`Cambiar: ${d.nombre}`}
+                    onClick={() => {
+                      setPorArchivar(null)
+                      setEditando(d.id)
+                    }}
+                  >
+                    Cambiar
+                  </Boton>
+                  <Boton
+                    variante="peligro"
+                    compacto
+                    aria-label={`Archivar: ${d.nombre}`}
+                    disabled={porArchivar === d.id}
+                    onClick={() => setPorArchivar(d.id)}
+                  >
+                    Archivar
+                  </Boton>
                 </div>
-                <Boton variante="secundario" compacto onClick={() => setEditando(d.id)}>
-                  Cambiar
-                </Boton>
-                <Boton variante="peligro" compacto onClick={() => archivar(d)}>
-                  Archivar
-                </Boton>
+                {porArchivar === d.id && (
+                  <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
+                    <span className="mr-auto text-lg">
+                      ¿Archivar <span className="font-semibold">{d.nombre}</span>? {consecuencia(cuantas.get(d.id) ?? 0)}
+                    </span>
+                    <Boton variante="secundario" compacto onClick={() => setPorArchivar(null)}>
+                      No
+                    </Boton>
+                    <Boton variante="peligro" compacto onClick={() => archivar(d)}>
+                      Sí, archivar
+                    </Boton>
+                  </div>
+                )}
               </li>
             ),
           )}

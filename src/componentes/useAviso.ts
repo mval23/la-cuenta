@@ -7,6 +7,11 @@ export interface DatosAviso {
   deshacer?: () => Promise<void>
 }
 
+// Cuánto se ve un aviso de éxito. Con Deshacer, más: hay que notarlo, leerlo y
+// decidir, a veces mientras se atiende a alguien. Otra acción lo cambia antes.
+const DURA_MS = 6_000
+const DURA_CON_DESHACER_MS = 20_000
+
 /** Los avisos de éxito se quitan solos; los de error se quedan hasta cerrarlos. */
 export function useAviso() {
   const [aviso, setAviso] = useState<DatosAviso | null>(null)
@@ -21,7 +26,7 @@ export function useAviso() {
     window.clearTimeout(temporizador.current)
     setAviso(nuevo)
     if (nuevo.tipo === 'ok') {
-      temporizador.current = window.setTimeout(() => setAviso(null), nuevo.deshacer ? 8000 : 5000)
+      temporizador.current = window.setTimeout(() => setAviso(null), nuevo.deshacer ? DURA_CON_DESHACER_MS : DURA_MS)
     }
   }, [])
 
