@@ -124,6 +124,13 @@ export function quincenaVecina(q: Quincena, paso: -1 | 1): Quincena {
   return quincenaDe(paso === 1 ? sumarDias(q.hasta, 1) : sumarDias(q.desde, -1))
 }
 
+/** El primer día de las últimas `cuantas` quincenas, contando la de `dia`. */
+export function inicioDeQuincenas(dia: string, cuantas: number): string {
+  let q = quincenaDe(dia)
+  for (let i = 1; i < cuantas; i++) q = quincenaVecina(q, -1)
+  return q.desde
+}
+
 const formatoMesSolo = new Intl.DateTimeFormat('es-CO', { timeZone: 'UTC', month: 'long' })
 
 /** "1 al 15 de septiembre de 2026" */

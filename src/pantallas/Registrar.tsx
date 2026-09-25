@@ -317,9 +317,11 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
   }
 
   // Lo que se anula en el historial puede ser una compra de la lista del día.
+  // También las personas: desde el detalle se cambian nombre, departamento o se
+  // archiva, y el dictado debe enterarse.
   async function alCambiarDetalle() {
     if (!abierta) return
-    const [saldo] = await Promise.all([cargarSaldo(abierta.persona_id), cargarCompras()])
+    const [saldo] = await Promise.all([cargarSaldo(abierta.persona_id), cargarCompras(), cargarPersonas()])
     if (saldo) setAbierta(saldo)
   }
 

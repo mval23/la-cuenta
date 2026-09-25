@@ -39,13 +39,18 @@ export function Ajustes({ perfil, activa, inicio }: { perfil: Perfil; activa: bo
 
   return (
     <section className="flex max-w-3xl flex-col gap-6">
-      {seccion !== 'inicio' && (
-        <BotonVolver texto="Volver a Ajustes" className="-mb-2" onClick={() => ir('inicio')} />
+      {/* Personas pone su propio encabezado: cuando abre el detalle de alguien, lo cambia. */}
+      {seccion !== 'personas' && (
+        <>
+          {seccion !== 'inicio' && (
+            <BotonVolver texto="Volver a Ajustes" className="-mb-2" onClick={() => ir('inicio')} />
+          )}
+          <h1 className="text-titulo font-bold">{titulos[seccion]}</h1>
+        </>
       )}
-      <h1 className="text-titulo font-bold">{titulos[seccion]}</h1>
 
       {seccion === 'inicio' && <Inicio perfil={perfil} activa={activa} onIr={ir} />}
-      {seccion === 'personas' && <Personas mostrar={mostrar} />}
+      {seccion === 'personas' && <Personas mostrar={mostrar} onVolver={() => ir('inicio')} />}
       {seccion === 'departamentos' && <Departamentos mostrar={mostrar} />}
 
       <Aviso aviso={aviso} onCerrar={cerrar} />

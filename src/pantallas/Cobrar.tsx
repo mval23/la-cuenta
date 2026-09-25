@@ -176,7 +176,8 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
     .map((s) => ({ id: s.persona_id, nombre: s.nombre, departamento_id: s.departamento_id, activo: true }))
   const nombreDepto = (id: number) => departamentos.find((d) => d.id === id)?.nombre ?? ''
 
-  const botonAgregar = (g: GrupoDeCobro) => (
+  /** Al final de la lista del departamento dice a cuál; en "Sin nada por cobrar" el nombre ya está al lado. */
+  const botonAgregar = (g: GrupoDeCobro, conDepartamento = false) => (
     <Boton
       variante="tintado"
       compacto
@@ -190,7 +191,7 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
       <span aria-hidden="true" className="text-2xl leading-none">
         +
       </span>
-      <span>Persona</span>
+      <span>{conDepartamento ? `Agregar persona a ${g.departamento}` : 'Persona'}</span>
     </Boton>
   )
 
@@ -214,15 +215,6 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
         <p className="text-lg text-tinta-suave">
           Por cobrar <span className="font-semibold text-tinta tabular-nums">{formatearPesos(porCobrar)}</span>
         </p>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Boton variante="secundario" onClick={() => irA('quincena')}>
-          PDF de la quincena
-        </Boton>
-        <Boton variante="secundario" onClick={() => irA('cuentaDeCobro')}>
-          Cuenta de cobro
-        </Boton>
       </div>
 
       <label className="flex flex-col gap-1">
@@ -275,9 +267,7 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
                   <span className="text-lg font-semibold tabular-nums">{formatearPesos(g.total)}</span>
                 </button>
               </h2>
-              {botonAgregar(g)}
             </div>
-            {agregandoEn === g.departamentoId && <div className="mb-3">{formularioAgregar(g)}</div>}
             {!plegado && (
               <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
                 {g.personas.map((s) => (
@@ -289,6 +279,9 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
                     onPago={(valor, tipo) => registrarPago(s, valor, tipo)}
                   />
                 ))}
+                <li className="px-3 py-2">
+                  {agregandoEn === g.departamentoId ? formularioAgregar(g) : botonAgregar(g, true)}
+                </li>
               </ul>
             )}
           </div>
@@ -297,7 +290,9 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
 
       {sinNadie.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-xl font-semibold">{grupos.length > 0 ? 'Sin nada por cobrar' : 'Departamentos'}</h2>
+          <h2 className="text-xl font-semibold">
+            {grupos.length > 0 ? 'Sin nada por cobrar' : 'Departamentos sin nada por cobrar'}
+          </h2>
           <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
             {sinNadie.map((g) => (
               <li key={g.departamentoId}>
@@ -312,10 +307,25 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
         </div>
       )}
 
-      <NuevoDepartamento mostrar={mostrar} onAgregado={cargar} />
-      <p className="text-base text-tinta-suave">
-        Para cambiar el nombre, toca a la persona. Para moverla de departamento o archivarla, ve a Ajustes.
-      </p>
+      <div className="flex flex-col gap-2 border-t border-linea pt-5">
+        <h2 className="text-xl font-semibold">Documentos de la quincena</h2>
+        <div className="flex flex-wrap gap-3">
+          <Boton variante="secundario" onClick={() => irA('quincena')}>
+            PDF de la quincena
+          </Boton>
+          <Boton variante="secundario" onClick={() => irA('cuentaDeCobro')}>
+            Cuenta de cobro
+          </Boton>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-linea pt-5">
+        <NuevoDepartamento mostrar={mostrar} onAgregado={cargar} />
+        <p className="text-lg text-tinta-suave">
+          Para cambiar el nombre o el departamento de alguien, o archivarlo, toca su nombre. Si está al día, búscalo
+          arriba.
+        </p>
+      </div>
     </section>
   )
 
