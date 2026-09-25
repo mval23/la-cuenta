@@ -101,6 +101,8 @@ const COMO_SE_DICE: Record<string, string> = {
   jessy: 'yesi', jessie: 'yesi', jessi: 'yesi', jesy: 'yesi',
   lady: 'leidi',
   ivette: 'ibeth', ivett: 'ibeth', ivet: 'ibeth', ivete: 'ibeth',
+  // El dictado a veces oye la "th" final de Ibeth como una "r".
+  iber: 'ibeth', iver: 'ibeth',
   allan: 'alan',
   gina: 'yina',
   joana: 'yoana',
