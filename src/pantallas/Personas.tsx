@@ -126,15 +126,16 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
       )}
 
       {activas.length > 0 && (
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar nombre o departamento"
-          aria-label="Buscar persona o departamento"
-          autoComplete="off"
-          className={campo}
-        />
+        <label className="flex flex-col gap-1">
+          <span className="text-base font-semibold text-tinta-suave">Buscar persona o departamento</span>
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            autoComplete="off"
+            className={campo}
+          />
+        </label>
       )}
 
       {activas.length === 0 && <p className="text-lg text-tinta-suave">Todavía no hay personas.</p>}
@@ -182,7 +183,7 @@ export function Personas({ mostrar }: { mostrar: (aviso: DatosAviso) => void }) 
                       Cambiar
                     </Boton>
                     <Boton
-                      variante="peligro"
+                      variante="secundario"
                       compacto
                       aria-label={`Archivar: ${p.nombre}`}
                       disabled={porArchivar === p.id}
@@ -277,28 +278,31 @@ function AgregarPersona({
     <form onSubmit={agregar} className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4">
       <span className="text-lg font-semibold">Agregar persona</span>
       <div className="grid gap-3 sm:grid-cols-[3fr_2fr]">
-        <input
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre y apellido"
-          aria-label="Nombre de la persona"
-          autoComplete="off"
-          autoCapitalize="words"
-          className={campo}
-        />
-        <select
-          value={departamentoId ?? ''}
-          onChange={(e) => setDepartamentoId(e.target.value ? Number(e.target.value) : null)}
-          aria-label="Departamento"
-          className={campo}
-        >
-          <option value="">Departamento...</option>
-          {departamentos.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.nombre}
-            </option>
-          ))}
-        </select>
+        <label className="flex flex-col gap-1">
+          <span className="text-base font-semibold text-tinta-suave">Nombre y apellido</span>
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="words"
+            className={campo}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-base font-semibold text-tinta-suave">Departamento</span>
+          <select
+            value={departamentoId ?? ''}
+            onChange={(e) => setDepartamentoId(e.target.value ? Number(e.target.value) : null)}
+            className={campo}
+          >
+            <option value="">Elegir...</option>
+            {departamentos.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <Parecidas nombre={nombre} personas={personas} nombreDepto={nombreDepto} />
       <Boton type="submit" className="self-end" disabled={!listo || guardando}>

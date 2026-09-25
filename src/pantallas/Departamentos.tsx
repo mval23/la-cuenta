@@ -151,7 +151,7 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
                     Cambiar
                   </Boton>
                   <Boton
-                    variante="peligro"
+                    variante="secundario"
                     compacto
                     aria-label={`Archivar: ${d.nombre}`}
                     disabled={porArchivar === d.id}
@@ -179,14 +179,11 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
         </ul>
       )}
 
-      <form onSubmit={agregar} className="flex flex-wrap gap-3">
-        <input
-          value={nuevo}
-          onChange={(e) => setNuevo(e.target.value)}
-          placeholder="Nombre del departamento"
-          aria-label="Nombre del nuevo departamento"
-          className={`${campo} min-w-0 flex-1`}
-        />
+      <form onSubmit={agregar} className="flex flex-wrap items-end gap-3">
+        <label className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <span className="text-base font-semibold text-tinta-suave">Nombre del departamento nuevo</span>
+          <input value={nuevo} onChange={(e) => setNuevo(e.target.value)} autoComplete="off" className={campo} />
+        </label>
         <Boton type="submit" disabled={!nuevo.trim()}>
           Agregar
         </Boton>

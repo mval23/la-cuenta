@@ -43,7 +43,7 @@ export function Parecidas({
           </p>
         ),
       )}
-      <p className="text-base text-aviso">
+      <p className="text-lg text-aviso">
         {onElegir ? 'Si no es ninguna, sigue: se crea la persona nueva.' : 'Si es otra persona, agrégala igual.'}
       </p>
     </div>

@@ -26,7 +26,7 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 | # | Tarea que se le lee | Qué debe pasar | Qué anotar |
 |---|---|---|---|
 | 1 | "Entra a la app." | Escribe su PIN. | ¿Se equivoca de tecla? ¿Lee el mensaje si falla? |
-| 2 | "Anota que Carlos Pérez de Prueba se llevó un almuerzo de 12 mil. Díselo al iPad." | Toca el micrófono, habla, revisa la tarjeta y toca OK. | ¿Sabe cuándo terminar de hablar? ¿Se corta si hace una pausa? ¿Lee la tarjeta antes de guardar? |
+| 2 | "Anota que Carlos Pérez de Prueba se llevó un almuerzo de 12 mil. Díselo al iPad." | Toca el micrófono, habla, revisa la tarjeta y toca Guardar $12.000. | ¿Sabe cuándo terminar de hablar? ¿Se corta si hace una pausa? ¿Lee la tarjeta antes de guardar? |
 | 3 | "Anota 8 mil para Carlos, pero sin hablar." | Toca Anotar a mano, busca a Carlos, elige cuál es, pone el valor y guarda. | ¿Encuentra Anotar a mano? ¿Entiende la pregunta de cuál Carlos es? |
 | 4 | "Anota un tinto de 500 para Carlos Gómez." | Aparece "¿Seguro que son $500?" y decide. | ¿Entiende la pregunta o la salta sin leer? |
 | 5 | "Empieza a anotar 10 mil para Carlos Pérez. Antes de guardar, alguien viene a pagar: ve a Cobrar, anota que Carlos Gómez abonó 5 mil y vuelve a terminar la compra." | Al volver a Registrar la tarjeta sigue ahí, con Carlos Pérez y $10.000. | ¿Encuentra la tarjeta al volver? ¿Cree que ya se había guardado? |
@@ -35,7 +35,7 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 | 8 | "¿Cuánto debe Carlos Gómez y qué compró? Si te paga ahora, anótalo." | Toca su nombre, lee el historial y toca Pagó todo ahí mismo. | ¿Explica el saldo con lo que ve? ¿Paga desde el detalle o vuelve a la lista? ¿Sabe volver? |
 | 9 | "Agrega a una persona nueva, Luisa Rojas, en Prueba." | En Cobrar toca + Persona en Prueba, dice o escribe el nombre y toca Agregar. | ¿Toca Cerrar sin agregar? ¿Entiende la pregunta que aparece? |
 | 10 | "Haz el PDF de esta quincena." | En Cobrar toca PDF de la quincena y luego Hacer el PDF y compartir. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
-| 11 | "Gira el iPad y anota otra compra." | Se ve igual, en una columna; el botón OK se ve con el teclado abierto. | ¿Se desorienta al girar? |
+| 11 | "Gira el iPad y anota otra compra." | Se ve igual, en una columna; el botón Guardar se ve con el teclado abierto. | ¿Se desorienta al girar? |
 
 ## Preguntas al final
 
@@ -46,8 +46,8 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 
 ## Qué mirar en el iPad, además de Amparo
 
-- La letra de la app no cambia con Ajustes del iPad > Pantalla y brillo > Tamaño del texto: ¿se lee bien con el tamaño que ella usa?
-- Con el teclado abierto en horizontal, el botón OK se ve al escribir el valor.
+- La letra sigue un poco el tamaño de texto del iPad (Pantalla y brillo > Tamaño del texto), hasta 19px: ¿se lee bien con el que ella usa? ¿Cabe todo? Si cabe y le sirve, probar subir el tope a 20 en src/lib/letra.ts.
+- Con el teclado abierto en horizontal, el botón Guardar se ve al escribir el valor.
 - La barra de pestañas no choca con la barra de inicio del iPad.
 - El aviso con Deshacer dura unos 20 segundos: ¿le alcanza? ¿Le estorba?
 - Con Ajustes > Accesibilidad > Movimiento > Reducir movimiento, no hay animaciones que parpadeen.

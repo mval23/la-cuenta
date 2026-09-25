@@ -56,18 +56,19 @@ export function PanelDePago({
 
   return (
     <form onSubmit={guardarAbono} className={`flex flex-col gap-2 bg-marca-suave px-4 py-3 ${className}`}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <input
-          value={abono}
-          onChange={(e) => setAbono(e.target.value.replace(/\D/g, '').replace(/^0+/, ''))}
-          inputMode="numeric"
-          enterKeyHint="done"
-          placeholder="Cuánto abonó"
-          aria-label={`Abono de ${s.nombre}`}
-          autoFocus
-          className={`${campo} max-w-48`}
-        />
-        <span className="mr-auto text-xl font-semibold tabular-nums">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-base font-semibold text-tinta-suave">Cuánto abonó</span>
+          <input
+            value={abono}
+            onChange={(e) => setAbono(e.target.value.replace(/\D/g, '').replace(/^0+/, ''))}
+            inputMode="numeric"
+            enterKeyHint="done"
+            autoFocus
+            className={`${campo} w-48`}
+          />
+        </label>
+        <span className="mr-auto flex min-h-12 items-center text-xl font-semibold tabular-nums">
           {valorAbono > 0 ? formatearPesos(valorAbono) : ''}
         </span>
         <Boton variante="secundario" compacto disabled={guardando} onClick={onCerrar}>
@@ -78,7 +79,7 @@ export function PanelDePago({
         </Boton>
       </div>
       {valorAbono > s.saldo && (
-        <p className="text-base text-info">
+        <p className="text-lg text-info">
           Es más de lo que debe: quedará {formatearPesos(valorAbono - s.saldo)} a favor.
         </p>
       )}

@@ -31,3 +31,18 @@ export function Boton({ variante = 'principal', compacto = false, className = ''
     />
   )
 }
+
+/**
+ * "Volver a Cobrar": con borde y flecha, arriba a la izquierda, para que se
+ * reconozca como botón y no como texto.
+ */
+export function BotonVolver({ texto, onClick, className = '' }: { texto: string; onClick: () => void; className?: string }) {
+  return (
+    <Boton variante="secundario" compacto className={`flex items-center gap-1 self-start pl-2 ${className}`} onClick={onClick}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 shrink-0 fill-none stroke-current stroke-[2.5]">
+        <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {texto}
+    </Boton>
+  )
+}

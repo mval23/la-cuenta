@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { DatosAviso } from '../componentes/useAviso'
-import { Boton } from '../componentes/Boton'
+import { Boton, BotonVolver } from '../componentes/Boton'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo } from '../componentes/estilos'
@@ -331,9 +331,7 @@ export function DetallePersona({
   return (
     <section className="flex flex-col gap-5">
       {!enPanel && (
-        <Boton variante="texto" className="-ml-3 self-start" onClick={onVolver}>
-          <span aria-hidden="true">‹ </span>Volver a {volverA}
-        </Boton>
+        <BotonVolver texto={`Volver a ${volverA}`} onClick={onVolver} />
       )}
 
       {/* En el panel, el saldo va debajo del nombre y "Cerrar" a la derecha. */}
@@ -344,28 +342,22 @@ export function DetallePersona({
           {renombrando ? (
             <CambiarNombre nombre={s.nombre} onCancelar={() => setRenombrando(false)} onGuardar={renombrar} />
           ) : (
-            <div className="min-w-0">
-              <div className="flex items-center gap-1">
-                <Titulo className="min-w-0 text-titulo font-bold">{s.nombre}</Titulo>
-                <button
-                  type="button"
+            <div className="flex min-w-0 flex-col gap-1">
+              <Titulo className="text-titulo font-bold">{s.nombre}</Titulo>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <p className="text-lg text-tinta-suave">
+                  {s.departamento}
+                  {!s.activo && ' · Archivada'}
+                </p>
+                <Boton
+                  variante="secundario"
+                  compacto
+                  aria-label={`Cambiar nombre de ${s.nombre}`}
                   onClick={() => setRenombrando(true)}
-                  aria-label={`Cambiar el nombre de ${s.nombre}`}
-                  className="flex size-12 shrink-0 items-center justify-center rounded-xl text-marca active:bg-hundido"
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    className="size-6 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"
-                  >
-                    <path d="M21.2 6.8a1 1 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8l-1.3 4.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z" />
-                  </svg>
-                </button>
+                  Cambiar nombre
+                </Boton>
               </div>
-              <p className="text-lg text-tinta-suave">
-                {s.departamento}
-                {!s.activo && ' · Archivada'}
-              </p>
             </div>
           )}
           {enPanel && !renombrando && (
@@ -436,7 +428,7 @@ export function DetallePersona({
 
       {movimientos && movimientos.length > 0 && (
         <>
-          <p className="-mb-3 text-base text-tinta-suave">Toca uno para cambiarlo.</p>
+          <p className="-mb-3 text-lg text-tinta-suave">Toca uno para cambiarlo.</p>
           <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
             {movimientos.map((m) => {
               const esPago = m.tabla === 'pagos'
@@ -485,9 +477,10 @@ export function DetallePersona({
                       <span className="w-24 text-center text-base text-tinta-suave">Anulado</span>
                     ) : (
                       <Boton
-                        variante="peligro"
+                        variante="secundario"
                         compacto
                         className="w-24"
+                        aria-label={`Anular: ${m.texto}, ${fechaCorta(m.fecha)}, ${formatearPesos(m.valor)}`}
                         disabled={confirmando === m.clave}
                         onClick={() => {
                           setEditando(null)
@@ -697,7 +690,7 @@ function AgregarCompra({
             <p className="text-xl font-semibold">
               ¿Seguro que son <span className="tabular-nums">{formatearPesos(numero)}</span>?
             </p>
-            <p className="text-base text-aviso">
+            <p className="text-lg text-aviso">
               {inusual === 'bajo' ? 'Parece poco para una compra. ¿Faltó poner "mil"?' : 'Parece mucho para una compra.'}
             </p>
           </div>
@@ -912,41 +905,42 @@ function BuscarPersona({
 
   return (
     <div className="flex flex-col gap-2">
-      <input
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar por nombre"
-        aria-label="Buscar a quién pasarlo"
-        autoComplete="off"
-        autoCapitalize="words"
-        autoFocus
-        className={campo}
-      />
+      <label className="flex flex-col gap-1">
+        <span className="text-base font-semibold text-tinta-suave">Buscar por nombre</span>
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          autoComplete="off"
+          autoCapitalize="words"
+          autoFocus
+          className={campo}
+        />
+      </label>
       {errorDeCarga ? (
         <ErrorDeCarga texto="No se pudo cargar las personas." onReintentar={cargar} />
       ) : personas === null ? (
-        <p className="text-base text-tinta-suave">Cargando...</p>
+        <p className="text-lg text-tinta-suave">Cargando...</p>
       ) : palabras.length === 0 && sugeridas.length > 0 ? (
         <>
-          <p className="text-base text-tinta-suave">Suenan parecido:</p>
+          <p className="text-lg text-tinta-suave">Suenan parecido:</p>
           {sugeridas.slice(0, MAXIMO).map(boton)}
-          <p className="text-base text-tinta-suave">¿No es ninguna? Escribe el nombre.</p>
+          <p className="text-lg text-tinta-suave">¿No es ninguna? Escribe el nombre.</p>
         </>
       ) : palabras.length === 0 ? (
-        <p className="text-base text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
+        <p className="text-lg text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
       ) : encontradas.length === 0 ? (
-        <p className="text-base text-tinta-suave">No hay nadie con ese nombre.</p>
+        <p className="text-lg text-tinta-suave">No hay nadie con ese nombre.</p>
       ) : (
         <>
           {encontradas.slice(0, MAXIMO).map(boton)}
           {encontradas.length > MAXIMO && (
-            <p className="text-base text-tinta-suave">
+            <p className="text-lg text-tinta-suave">
               Hay {encontradas.length - MAXIMO} más. Escribe más del nombre o el departamento.
             </p>
           )}
         </>
       )}
-      <Boton variante="texto" compacto className="-ml-4 self-start" onClick={onCancelar}>
+      <Boton variante="secundario" compacto className="self-start" onClick={onCancelar}>
         {textoCancelar}
       </Boton>
     </div>
