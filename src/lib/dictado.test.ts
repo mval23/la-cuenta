@@ -362,6 +362,12 @@ describe('persona que suena parecido (la voz la escribe distinto)', () => {
     expect(leer('Ferney 12', gente).persona?.id).toBe(21)
   })
 
+  it('reconoce a Ibeth aunque la voz escriba "Iber"', () => {
+    const conIbeth = [...gente, { id: 24, nombre: 'Ibeth', departamento_id: SISTEMAS, activo: true }]
+    expect(leer('Iber 12', conIbeth)).toMatchObject({ persona: { id: 24 }, valor: 12000 })
+    expect(leer('iber, 8 mil', conIbeth).persona?.id).toBe(24)
+  })
+
   it('si dos personas suenan igual, pregunta cuál', () => {
     const conDos = [...gente, { id: 23, nombre: 'Fernay', departamento_id: SISTEMAS, activo: true }]
     const r = leer('Ferney 12', conDos)
