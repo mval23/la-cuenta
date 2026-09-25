@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Boton } from './Boton'
 import { ErrorDeCarga } from './ErrorDeCarga'
-import { campo } from './estilos'
+import { campo, etiqueta } from './estilos'
 import { normalizarNombre, suenanParecido } from '../lib/personas'
 import { supabase } from '../lib/supabase'
 
@@ -90,7 +90,7 @@ export function BuscarPersona({
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-tinta-suave">Buscar por nombre</span>
+        <span className={etiqueta}>Buscar por nombre</span>
         <input
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { DatosAviso } from '../componentes/useAviso'
 import { Boton, BotonVolver } from '../componentes/Boton'
+import { Confirmar } from '../componentes/Confirmar'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { BuscarPersona, type Quien } from '../componentes/BuscarPersona'
 import { DatosDePersona } from '../componentes/DatosDePersona'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import { PanelDePago } from '../componentes/Pago'
 import { fechaLarga, hoyBogota, inicioDeQuincenas, nombreDeQuincena, quincenaDe, type Quincena } from '../lib/fechas'
 import type { TipoDePago } from '../lib/pagos'
@@ -348,15 +349,12 @@ export function DetallePersona({
           )}
         </div>
         {confirmando === m.clave && (
-          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-peligro-suave px-4 py-3">
-            <span className="mr-auto text-lg">¿Anular {esPago ? 'este pago' : 'esta compra'}?</span>
-            <Boton variante="secundario" compacto onClick={() => setConfirmando(null)}>
-              No
-            </Boton>
-            <Boton variante="peligro" compacto onClick={() => anular(m)}>
-              Sí, anular
-            </Boton>
-          </div>
+          <Confirmar
+            pregunta={`¿Anular ${esPago ? 'este pago' : 'esta compra'}?`}
+            textoSi="Sí, anular"
+            onNo={() => setConfirmando(null)}
+            onSi={() => anular(m)}
+          />
         )}
         {editando === m.clave && (
           <Editar
@@ -407,7 +405,7 @@ export function DetallePersona({
             </p>
           </div>
           {enPanel && (
-            <Boton variante="texto" compacto className="-mr-3" onClick={onVolver}>
+            <Boton variante="secundario" compacto onClick={onVolver}>
               Cerrar
             </Boton>
           )}
@@ -565,7 +563,7 @@ function AgregarCompra({
       <p className="text-xl font-semibold">Otra compra de {nombre}</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
+          <span className={etiqueta}>Cuánto</span>
           <span className="flex min-h-14 items-center rounded-xl border border-control bg-superficie px-4 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-marca">
             <span aria-hidden="true" className="text-2xl font-bold text-tinta-suave">
               $
@@ -587,12 +585,12 @@ function AgregarCompra({
           </span>
         </label>
         <div className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Día</span>
+          <span className={etiqueta}>Día</span>
           <ElegirDia dia={fecha} hoy={hoy} etiqueta="Día de la compra" resaltado={fecha !== hoy} onCambiar={setFecha} />
         </div>
       </div>
       <label className="flex flex-col gap-2">
-        <span className="text-base font-semibold text-tinta-suave">
+        <span className={etiqueta}>
           Qué llevó <span className="font-normal">(opcional)</span>
         </span>
         <input
@@ -675,7 +673,7 @@ function Editar({
   return (
     <form onSubmit={guardar} className="flex flex-col gap-4 bg-hundido px-4 py-4">
       <div className="flex flex-col gap-2">
-        <span className="text-base font-semibold text-tinta-suave">Quién</span>
+        <span className={etiqueta}>Quién</span>
         {cambiandoQuien ? (
           <BuscarPersona
             onElegir={(q) => {
@@ -697,7 +695,7 @@ function Editar({
       </div>
       {m.tabla === 'compras' && (
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Qué llevó (si quieres)</span>
+          <span className={etiqueta}>Qué llevó (si quieres)</span>
           <input
             value={queLlevo}
             onChange={(e) => setQueLlevo(e.target.value)}
@@ -709,7 +707,7 @@ function Editar({
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
+          <span className={etiqueta}>Cuánto</span>
           <span className="flex min-h-14 items-center rounded-xl border border-control bg-superficie px-4 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-marca">
             <span aria-hidden="true" className="text-2xl font-bold text-tinta-suave">
               $
@@ -726,7 +724,7 @@ function Editar({
           </span>
         </label>
         <div className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Día</span>
+          <span className={etiqueta}>Día</span>
           <ElegirDia
             dia={fecha}
             hoy={hoy}

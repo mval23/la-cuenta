@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Boton } from '../componentes/Boton'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import { LARGO_PIN, olvidarPin, quedoBloqueado } from '../lib/candado'
 import { supabase } from '../lib/supabase'
 
@@ -53,7 +53,7 @@ export function Login() {
           Esto se hace una sola vez. Después, La Cuenta se abre con un PIN de {LARGO_PIN} números.
         </p>
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Correo de la cuenta</span>
+          <span className={etiqueta}>Correo de la cuenta</span>
           <input
             type="email"
             value={correo}
@@ -65,7 +65,7 @@ export function Login() {
           />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Contraseña</span>
+          <span className={etiqueta}>Contraseña</span>
           <input
             type="password"
             value={clave}

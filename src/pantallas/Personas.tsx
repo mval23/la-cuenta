@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Boton, BotonVolver } from '../componentes/Boton'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import { MensajeDeError } from '../componentes/MensajeDeError'
 import { Parecidas } from '../componentes/Parecidas'
 import type { DatosAviso } from '../componentes/useAviso'
@@ -173,7 +173,7 @@ export function Personas({ mostrar, onVolver }: { mostrar: (aviso: DatosAviso) =
 
       {activas.length > 0 && (
         <label className="flex flex-col gap-1">
-          <span className="text-base font-semibold text-tinta-suave">Buscar persona o departamento</span>
+          <span className={etiqueta}>Buscar persona o departamento</span>
           <input
             type="search"
             value={busqueda}
@@ -264,7 +264,7 @@ function AgregarPersona({
       <span className="text-lg font-semibold">Agregar persona</span>
       <div className="grid gap-3 sm:grid-cols-[3fr_2fr]">
         <label className="flex flex-col gap-1">
-          <span className="text-base font-semibold text-tinta-suave">Nombre y apellido</span>
+          <span className={etiqueta}>Nombre y apellido</span>
           <input
             value={nombre}
             onChange={(e) => {
@@ -279,7 +279,7 @@ function AgregarPersona({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-base font-semibold text-tinta-suave">Departamento</span>
+          <span className={etiqueta}>Departamento</span>
           <select
             value={departamentoId ?? ''}
             onChange={(e) => {

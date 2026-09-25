@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Boton, BotonVolver } from '../componentes/Boton'
 import { BotonPdf } from '../componentes/BotonPdf'
+import { Confirmar } from '../componentes/Confirmar'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { Microfono } from '../componentes/Microfono'
-import { campo } from '../componentes/estilos'
+import { campo, etiqueta } from '../componentes/estilos'
 import type { DatosAviso } from '../componentes/useAviso'
 import { entenderCuenta } from '../lib/cuentaDictada'
 import { hoyBogota } from '../lib/fechas'
@@ -177,6 +178,22 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
     )
   }
 
+  // Se quita de una vez, sin preguntar: el aviso ofrece traerla de vuelta en su lugar.
+  function quitarFila(clave: number) {
+    const lugar = filas.findIndex((f) => f.clave === clave)
+    if (lugar < 0) return
+    const quitada = filas[lugar]
+    setFilas(filas.filter((f) => f.clave !== clave))
+    mostrar({
+      tipo: 'ok',
+      texto: `Se quitó la fila ${lugar + 1}${quitada.descripcion.trim() ? `: ${quitada.descripcion.trim()}` : ''}.`,
+      deshacer: async () => {
+        setFilas((antes) => [...antes.slice(0, lugar), quitada, ...antes.slice(lugar)])
+        mostrar({ tipo: 'ok', texto: 'La fila volvió a la cuenta.' })
+      },
+    })
+  }
+
   function agregarFila() {
     const ultima = filas.at(-1)
     setFilas([
@@ -216,7 +233,6 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
     )
   }
 
-  const etiqueta = 'text-base font-semibold text-tinta-suave'
 
   return (
     <section className="flex max-w-3xl flex-col gap-6">
@@ -245,7 +261,7 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
             <strong className="font-semibold">{datos.nombre}</strong>
             <span className="text-tinta-suave"> · CC. {datos.documento}</span>
           </p>
-          <Boton variante="texto" compacto onClick={() => setEditandoDatos(true)}>
+          <Boton variante="secundario" compacto onClick={() => setEditandoDatos(true)}>
             Cambiar
           </Boton>
         </div>
@@ -334,7 +350,7 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
               fila={f}
               hoy={hoy}
               onCambiar={(cambios) => cambiarFila(f.clave, cambios)}
-              onQuitar={() => setFilas(filas.filter((x) => x.clave !== f.clave))}
+              onQuitar={() => quitarFila(f.clave)}
             />
           ))}
         </ol>
@@ -368,17 +384,16 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
 
       {(filas.length > 0 || dictados.length > 0) &&
         (borrando ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-aviso-suave p-4">
-            <span className="mr-auto text-lg">¿Borrar las filas para empezar otra cuenta?</span>
-            <Boton variante="secundario" compacto onClick={() => setBorrando(false)}>
-              No
-            </Boton>
-            <Boton compacto onClick={empezarOtra}>
-              Sí, empezar otra
-            </Boton>
-          </div>
+          <Confirmar
+            forma="tarjeta"
+            tono="aviso"
+            pregunta="¿Borrar las filas para empezar otra cuenta?"
+            textoSi="Sí, empezar otra"
+            onNo={() => setBorrando(false)}
+            onSi={empezarOtra}
+          />
         ) : (
-          <Boton variante="texto" className="-ml-3 self-start" onClick={() => setBorrando(true)}>
+          <Boton variante="secundario" className="self-start" onClick={() => setBorrando(true)}>
             Empezar otra cuenta
           </Boton>
         ))}
@@ -399,17 +414,16 @@ function FilaEditable({
   onCambiar: (cambios: Partial<FilaDeCobro>) => void
   onQuitar: () => void
 }) {
-  const etiqueta = 'text-base text-tinta-suave'
   const numeroCampo = `${campo} tabular-nums`
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-linea bg-superficie p-4" aria-label={`Fila ${numero}`}>
-      <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 sm:grid-cols-[minmax(0,1fr)_5rem_8.5rem_9rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-3 sm:grid-cols-[minmax(0,1fr)_6rem_8.5rem_9rem]">
         <div className="col-span-1 flex flex-col gap-1">
           <span className={etiqueta}>Fecha</span>
           <ElegirDia dia={f.fecha} hoy={hoy} onCambiar={(fecha) => onCambiar({ fecha })} etiqueta={`Fecha de la fila ${numero}`} diasAtras={DIAS_ATRAS_EN_CUENTA} />
         </div>
         <label className="flex flex-col gap-1">
-          <span className={etiqueta}>Unid.</span>
+          <span className={etiqueta}>Cantidad</span>
           <input
             value={f.unidades ?? ''}
             onChange={(e) => onCambiar({ unidades: soloNumero(e.target.value) })}
@@ -418,7 +432,7 @@ function FilaEditable({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={etiqueta}>Vr. unitario</span>
+          <span className={etiqueta}>Cada uno</span>
           <input
             value={conPuntos(f.valorUnitario)}
             onChange={(e) => onCambiar({ valorUnitario: soloNumero(e.target.value) })}
@@ -427,7 +441,7 @@ function FilaEditable({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={etiqueta}>Vr. total</span>
+          <span className={etiqueta}>Total</span>
           <input
             value={conPuntos(f.valorTotal)}
             onChange={(e) => onCambiar({ valorTotal: soloNumero(e.target.value) ?? 0 })}
@@ -448,7 +462,7 @@ function FilaEditable({
             className={`${campo} ${f.descripcion.trim() ? '' : 'border-2 border-aviso bg-aviso-suave'}`}
           />
         </label>
-        <Boton variante="peligro" onClick={onQuitar} aria-label={`Quitar la fila ${numero}`}>
+        <Boton variante="secundario" onClick={onQuitar} aria-label={`Quitar la fila ${numero}`}>
           Quitar
         </Boton>
       </div>
@@ -483,7 +497,6 @@ function DatosPropios({
     else onGuardado({ ...datos, ...cambios })
   }
 
-  const etiqueta = 'text-base font-semibold text-tinta-suave'
   return (
     <form onSubmit={guardar} className="flex flex-col gap-4 rounded-2xl border border-linea bg-superficie p-5">
       <div>
