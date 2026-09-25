@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Boton } from '../componentes/Boton'
+import { Boton, BotonVolver } from '../componentes/Boton'
 import { BotonPdf } from '../componentes/BotonPdf'
 import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
@@ -220,9 +220,7 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
 
   return (
     <section className="flex max-w-3xl flex-col gap-6">
-      <Boton variante="texto" className="-mb-4 -ml-3 self-start" onClick={onVolver}>
-        <span aria-hidden="true">‹ </span>Volver a Cobrar
-      </Boton>
+      <BotonVolver texto="Volver a Cobrar" className="-mb-2" onClick={onVolver} />
       <h1 className="text-titulo font-bold">Cuenta de cobro</h1>
 
       {errorDeCarga && <ErrorDeCarga texto="No se pudieron cargar tus datos." onReintentar={cargar} />}
@@ -306,20 +304,22 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
         )}
         {escribir ? (
           <form onSubmit={enviarEscrito} className="flex flex-col gap-2">
-            <textarea
-              value={escrito}
-              onChange={(e) => setEscrito(e.target.value)}
-              rows={3}
-              placeholder="El 25 de agosto 2 desayunos personal gerencia 32 mil"
-              aria-label="Explicación de la cuenta"
-              className={`${campo} py-3`}
-            />
+            <label className="flex flex-col gap-1">
+              <span className={etiqueta}>Escribe la cuenta como la dirías</span>
+              <textarea
+                value={escrito}
+                onChange={(e) => setEscrito(e.target.value)}
+                rows={3}
+                placeholder="El 25 de agosto 2 desayunos personal gerencia 32 mil"
+                className={`${campo} py-3`}
+              />
+            </label>
             <Boton type="submit" variante="tintado" className="self-end" disabled={!escrito.trim() || entendiendo}>
               Agregar a la cuenta
             </Boton>
           </form>
         ) : (
-          <Boton variante="texto" className="-ml-3 self-start" onClick={() => setEscribir(true)}>
+          <Boton variante="secundario" className="self-start" onClick={() => setEscribir(true)}>
             Prefiero escribirlo
           </Boton>
         )}

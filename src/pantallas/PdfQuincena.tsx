@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Boton } from '../componentes/Boton'
+import { BotonVolver } from '../componentes/Boton'
 import { BotonPdf } from '../componentes/BotonPdf'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { agruparParaCobro } from '../lib/cobro'
@@ -39,9 +39,7 @@ export function PdfQuincena({ onVolver, onError }: { onVolver: () => void; onErr
 
   return (
     <section className="flex max-w-3xl flex-col gap-5">
-      <Boton variante="texto" className="-mb-2 -ml-3 self-start" onClick={onVolver}>
-        <span aria-hidden="true">‹ </span>Volver a Cobrar
-      </Boton>
+      <BotonVolver texto="Volver a Cobrar" onClick={onVolver} />
       <h1 className="text-titulo font-bold">Cuenta de la quincena</h1>
 
       <div className="flex items-center gap-2 rounded-2xl border border-linea bg-superficie p-2">
@@ -116,7 +114,7 @@ export function PdfQuincena({ onVolver, onError }: { onVolver: () => void; onErr
             preparar={() => pdfDeQuincena(filas, quincena, hoy)}
             onError={onError}
           />
-          <p className="text-base text-tinta-suave">
+          <p className="text-lg text-tinta-suave">
             Sale una lista por departamento con lo que cada persona venía debiendo, lo que compró y pagó en la
             quincena, y lo que debe. Se puede mandar por WhatsApp, imprimir o guardar.
           </p>

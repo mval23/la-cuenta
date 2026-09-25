@@ -225,15 +225,16 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
         </Boton>
       </div>
 
-      <input
-        type="search"
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar nombre o departamento"
-        aria-label="Buscar persona o departamento"
-        autoComplete="off"
-        className={campo}
-      />
+      <label className="flex flex-col gap-1">
+        <span className="text-base font-semibold text-tinta-suave">Buscar persona o departamento</span>
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          autoComplete="off"
+          className={campo}
+        />
+      </label>
 
       {errorDeCarga && (
         <ErrorDeCarga texto="No se pudieron actualizar los saldos." onReintentar={cargar} />
@@ -313,7 +314,7 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
 
       <NuevoDepartamento mostrar={mostrar} onAgregado={cargar} />
       <p className="text-base text-tinta-suave">
-        Para cambiar un nombre, mover a alguien de departamento o archivar, ve a Ajustes.
+        Para cambiar el nombre, toca a la persona. Para moverla de departamento o archivarla, ve a Ajustes.
       </p>
     </section>
   )
@@ -361,7 +362,7 @@ function FilaDeCobro({
 
   return (
     <li>
-      <div className="flex items-center gap-2 py-1.5 pr-3">
+      <div className="flex items-center gap-3 py-1.5 pr-3">
         <button
           type="button"
           onClick={onAbrir}

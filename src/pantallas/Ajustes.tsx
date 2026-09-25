@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { Aviso } from '../componentes/Aviso'
-import { Boton } from '../componentes/Boton'
+import { Boton, BotonVolver } from '../componentes/Boton'
 import { useAviso } from '../componentes/useAviso'
 import { olvidarPin } from '../lib/candado'
 import { supabase } from '../lib/supabase'
@@ -40,9 +40,7 @@ export function Ajustes({ perfil, activa, inicio }: { perfil: Perfil; activa: bo
   return (
     <section className="flex max-w-3xl flex-col gap-6">
       {seccion !== 'inicio' && (
-        <Boton variante="texto" className="-mb-4 -ml-3 self-start" onClick={() => ir('inicio')}>
-          <span aria-hidden="true">‹ </span>Ajustes
-        </Boton>
+        <BotonVolver texto="Volver a Ajustes" className="-mb-2" onClick={() => ir('inicio')} />
       )}
       <h1 className="text-titulo font-bold">{titulos[seccion]}</h1>
 

@@ -188,16 +188,17 @@ export function NuevoDepartamento({
   }
 
   return (
-    <form onSubmit={agregar} className="flex flex-wrap gap-3 rounded-xl border border-linea bg-superficie p-4">
-      <input
-        value={nombre}
-        onChange={(e) => setNombre(e.target.value)}
-        placeholder="Nombre del departamento"
-        aria-label="Nombre del nuevo departamento"
-        autoComplete="off"
-        autoFocus
-        className={`${campo} min-w-0 flex-1 basis-60`}
-      />
+    <form onSubmit={agregar} className="flex flex-wrap items-end gap-3 rounded-xl border border-linea bg-superficie p-4">
+      <label className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+        <span className="text-base font-semibold text-tinta-suave">Nombre del departamento nuevo</span>
+        <input
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          autoComplete="off"
+          autoFocus
+          className={campo}
+        />
+      </label>
       <Boton type="submit" disabled={!nombre.trim()}>
         Agregar
       </Boton>

@@ -397,7 +397,7 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
               />
             )}
             {/* Sin dictar: se elige quién y se pone cuánto. También si la voz falla o no hay micrófono. */}
-            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarAMano}>
+            <Boton variante="secundario" className="self-start" onClick={anotarAMano}>
               Anotar a mano
             </Boton>
           </div>
@@ -427,7 +427,7 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
   if (dia === hoy) {
     // La fecha y "Cambiar" abren el calendario de una vez.
     return (
-      <div className="-my-2 flex flex-wrap items-center gap-x-3">
+      <div className="-my-1 flex flex-wrap items-center gap-x-3 gap-y-2">
         <p className="text-xl text-tinta-suave">
           Compras de{' '}
           <button
@@ -439,8 +439,8 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
             hoy, {fechaLarga(hoy)}
           </button>
         </p>
-        <Boton variante="texto" compacto className="-ml-2" aria-haspopup="dialog" onClick={() => setCalendario(true)}>
-          Cambiar
+        <Boton variante="secundario" compacto aria-haspopup="dialog" onClick={() => setCalendario(true)}>
+          Cambiar día
         </Boton>
         {calendario && (
           <Calendario
@@ -463,7 +463,7 @@ function DiaDeRegistro({ dia, hoy, onCambiar }: { dia: string; hoy: string; onCa
     <div className="flex flex-col gap-3 rounded-xl border-2 border-aviso bg-aviso-suave p-4" role="status">
       <div>
         <p className="text-2xl font-bold">Anotando compras del {fechaLarga(dia)}</p>
-        <p className="text-base text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
+        <p className="text-lg text-aviso">Todo lo que se registre ahora queda con ese día, no con hoy.</p>
       </div>
       <div className="flex flex-wrap gap-3">
         <ElegirDia
@@ -551,6 +551,7 @@ function Confirmacion({
     setModo('nueva')
   }
   const otroDia = b.fecha !== hoy
+  const etiqueta = 'text-base font-semibold text-tinta-suave'
 
   const valor = Number(b.valor)
   const faltan = [
@@ -591,7 +592,7 @@ function Confirmacion({
             <p className="text-xl font-semibold">
               ¿Seguro que son <span className="tabular-nums">{formatearPesos(valor)}</span>?
             </p>
-            <p className="text-base text-aviso">
+            <p className="text-lg text-aviso">
               {inusual === 'bajo'
                 ? 'Parece poco para una compra. ¿Faltó decir "mil"?'
                 : 'Parece mucho para una compra.'}
@@ -606,19 +607,19 @@ function Confirmacion({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3 border-b border-linea pb-4">
-          <p className="mr-auto text-base text-aviso">{!listo && `Falta: ${faltan.join(', ')}.`}</p>
+          <p className="mr-auto text-lg text-aviso">{!listo && `Falta: ${faltan.join(', ')}.`}</p>
           <Boton variante="secundario" onClick={onCancelar}>
             Cancelar
           </Boton>
-          <Boton type="submit" className="min-w-44" disabled={!listo || guardando}>
-            {guardando ? 'Guardando...' : 'OK'}
+          <Boton type="submit" className="min-w-44 tabular-nums" disabled={!listo || guardando}>
+            {guardando ? 'Guardando...' : valor > 0 ? `Guardar ${formatearPesos(valor)}` : 'Guardar'}
           </Boton>
         </div>
       )}
 
       {/* Quién */}
       <div className="flex flex-col gap-2">
-        <span className="text-base font-semibold text-tinta-suave">Quién</span>
+        <span className={etiqueta}>Quién</span>
         {elegida ? (
           <div className="flex items-center gap-3">
             <p className="min-w-0 flex-1 text-2xl font-bold">
@@ -642,30 +643,33 @@ function Confirmacion({
           </div>
         ) : modo === 'nueva' ? (
           <>
-            <p className="text-base text-tinta-suave">Persona nueva. Escribe el nombre y elige el departamento:</p>
+            <p className="text-lg">Persona nueva:</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                value={b.nombreNuevo}
-                onChange={(e) => cambiar({ nombreNuevo: e.target.value })}
-                placeholder="Nombre"
-                aria-label="Nombre de la persona nueva"
-                autoComplete="off"
-                autoCapitalize="words"
-                className={campo}
-              />
-              <select
-                value={b.departamentoId ?? ''}
-                onChange={(e) => cambiar({ departamentoId: e.target.value ? Number(e.target.value) : null })}
-                aria-label="Departamento de la persona nueva"
-                className={campo}
-              >
-                <option value="">Elegir departamento...</option>
-                {departamentos.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nombre}
-                  </option>
-                ))}
-              </select>
+              <label className="flex flex-col gap-1">
+                <span className={etiqueta}>Nombre y apellido</span>
+                <input
+                  value={b.nombreNuevo}
+                  onChange={(e) => cambiar({ nombreNuevo: e.target.value })}
+                  autoComplete="off"
+                  autoCapitalize="words"
+                  className={campo}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className={etiqueta}>Departamento</span>
+                <select
+                  value={b.departamentoId ?? ''}
+                  onChange={(e) => cambiar({ departamentoId: e.target.value ? Number(e.target.value) : null })}
+                  className={campo}
+                >
+                  <option value="">Elegir...</option>
+                  {departamentos.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <Parecidas
               nombre={b.nombreNuevo}
@@ -673,55 +677,60 @@ function Confirmacion({
               nombreDepto={nombreDepto}
               onElegir={(p) => cambiar({ personaId: p.id })}
             />
-            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={buscarExistente}>
+            <Boton variante="secundario" compacto className="self-start" onClick={buscarExistente}>
               Elegir una persona que ya existe
             </Boton>
           </>
         ) : modo === 'buscar' ? (
           <>
-            <input
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por nombre"
-              aria-label="Buscar una persona que ya existe"
-              autoComplete="off"
-              autoCapitalize="words"
-              autoFocus
-              className={campo}
-            />
+            <label className="flex flex-col gap-1">
+              <span className={etiqueta}>Buscar por nombre</span>
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="words"
+                autoFocus
+                className={campo}
+              />
+            </label>
             {palabras.length === 0 ? (
-              <p className="text-base text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
+              <p className="text-lg text-tinta-suave">Escribe el nombre, o el nombre y el departamento.</p>
             ) : encontradas.length === 0 ? (
-              <p className="text-base text-tinta-suave">No hay nadie con ese nombre.</p>
+              <p className="text-lg text-tinta-suave">No hay nadie con ese nombre.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {encontradas.slice(0, MAXIMO).map(botonPersona)}
                 {encontradas.length > MAXIMO && (
-                  <p className="text-base text-tinta-suave">
+                  <p className="text-lg text-tinta-suave">
                     Hay {encontradas.length - MAXIMO} más. Escribe más del nombre o el departamento.
                   </p>
                 )}
               </div>
             )}
-            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarNueva}>
-              No está: es una persona nueva
-            </Boton>
-            {b.candidatas.length > 0 && (
-              <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setModo('sugeridas')}>
-                Volver a las personas sugeridas
+            <div className="flex flex-wrap gap-3">
+              <Boton variante="secundario" compacto onClick={anotarNueva}>
+                No está: es una persona nueva
               </Boton>
-            )}
+              {b.candidatas.length > 0 && (
+                <Boton variante="secundario" compacto onClick={() => setModo('sugeridas')}>
+                  Volver a las sugeridas
+                </Boton>
+              )}
+            </div>
           </>
         ) : (
           <>
-            <p className="text-base text-tinta-suave">¿Es alguna de estas personas?</p>
+            <p className="text-lg">¿Es alguna de estas personas?</p>
             <div className="flex flex-col gap-2">{b.candidatas.map(botonPersona)}</div>
-            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={() => setModo('buscar')}>
-              Buscar otra persona
-            </Boton>
-            <Boton variante="texto" compacto className="-ml-4 self-start" onClick={anotarNueva}>
-              No es ninguna: es una persona nueva
-            </Boton>
+            <div className="flex flex-wrap gap-3">
+              <Boton variante="secundario" compacto onClick={() => setModo('buscar')}>
+                Buscar otra persona
+              </Boton>
+              <Boton variante="secundario" compacto onClick={anotarNueva}>
+                No es ninguna: es una persona nueva
+              </Boton>
+            </div>
           </>
         )}
       </div>
@@ -729,7 +738,7 @@ function Confirmacion({
       {/* Cuánto y qué día */}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Cuánto</span>
+          <span className={etiqueta}>Cuánto</span>
           <span className="flex min-h-16 items-center rounded-xl border border-control bg-superficie px-4 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-marca">
             <span aria-hidden="true" className="text-3xl font-bold text-tinta-suave">
               $
@@ -750,7 +759,7 @@ function Confirmacion({
           </span>
         </label>
         <div className="flex flex-col gap-2">
-          <span className="text-base font-semibold text-tinta-suave">Día</span>
+          <span className={etiqueta}>Día</span>
           {puedeCambiarDia ? (
             <ElegirDia
               dia={b.fecha}
@@ -888,9 +897,10 @@ function ComprasDelDia({
               ) : (
                 puedeAnular && (
                   <Boton
-                    variante="peligro"
+                    variante="secundario"
                     compacto
                     className="w-24"
+                    aria-label={`Anular: ${c.personas?.nombre ?? ''}, ${formatearPesos(c.valor_pesos)}`}
                     disabled={confirmando === c.id}
                     onClick={() => setConfirmando(c.id)}
                   >
