@@ -10,10 +10,21 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 
 - Usar el iPad de Amparo, con la app instalada en la pantalla de inicio (no en Safari).
 - Probar en la cocina, con su luz, sus gafas, su tamaño de texto y en la posición en que lo va a usar.
-- Crear datos de prueba: un departamento "Prueba" con tres personas, dos de ellas con el
-  mismo primer nombre (por ejemplo, "Carlos Pérez" y "Carlos Gómez"). Anotarle a Carlos Gómez
-  un par de compras.
-- Al terminar, anular lo registrado y archivar el departamento "Prueba".
+- Crear los datos de prueba, justo antes de empezar, desde la terminal en la carpeta del proyecto:
+
+  ```bash
+  npx supabase db query --linked "$(cat scripts/prueba-preparar.sql)"
+  ```
+
+  Crea los departamentos "Prueba" y "Prueba 2" y, en "Prueba", a Carlos Pérez, Carlos Gómez
+  (mismo primer nombre, a propósito) y Marta Ruiz. Carlos Gómez queda debiendo $29.000: dos
+  compras de esta semana y una de hace cuatro meses, para que su historial muestre
+  "Antes del …". Al final muestra lo que quedó.
+- Al terminar, deshacerlo (anula lo anotado y archiva personas y departamentos de prueba):
+
+  ```bash
+  npx supabase db query --linked "$(cat scripts/prueba-limpiar.sql)"
+  ```
 
 ## Cómo observar
 
@@ -36,7 +47,7 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 | 9 | "Agrega a una persona nueva, Luisa Rojas, en Prueba." | En Cobrar, al final de la lista de Prueba, toca Agregar persona a Prueba, dice o escribe el nombre y toca Agregar. | ¿Toca Cerrar sin agregar? ¿Entiende la pregunta que aparece? |
 | 10 | "Haz el PDF de esta quincena." | En Cobrar baja hasta Documentos de la quincena, toca PDF de la quincena y luego Hacer el PDF y compartir. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
 | 11 | "Gira el iPad y anota otra compra." | Se ve igual, en una columna; el botón Guardar se ve con el teclado abierto. | ¿Se desorienta al girar? |
-| 12 | "Luisa Rojas se pasó a otro departamento. Cámbiala." | Busca a Luisa, abre su detalle, baja a Datos de Luisa Rojas y toca Cambiar departamento. | ¿Busca esto en Ajustes o en el detalle? ¿Encuentra la sección de abajo? |
+| 12 | "Luisa Rojas se pasó a Prueba 2. Cámbiala." | Busca a Luisa, abre su detalle, baja a Datos de Luisa Rojas, toca Cambiar departamento y elige Prueba 2. | ¿Busca esto en Ajustes o en el detalle? ¿Encuentra la sección de abajo? |
 
 ## Preguntas al final
 
@@ -61,6 +72,9 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 - Califica su confianza en 4 o más.
 
 ## Registro
+
+Se puede anotar en la hoja "Prueba con Amparo" que Mariana tiene en claude.ai (una por ronda: la primera vez y una semana después; calcula sola los criterios de arriba y Claude puede leerla para analizarla), o en esta tabla.
+
 
 | Fecha | Tarea | Lo que pasó | Idea para mejorar |
 |---|---|---|---|
