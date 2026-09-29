@@ -86,8 +86,9 @@ export function DetallePersona({
   /** La pantalla a la que lleva "Volver". */
   volverA?: string
   /**
-   * Desde Registrar se le pueden anotar más compras aquí mismo; empiezan en el
-   * día que se está registrando. Sin esto no aparece el botón.
+   * Desde Registrar: las compras que se anotan aquí empiezan en el día que se
+   * está registrando y "Otra compra" va primero. Sin esto empiezan hoy y lo
+   * principal es el pago.
    */
   diaParaAgregar?: string
   onVolver: () => void
@@ -382,7 +383,18 @@ export function DetallePersona({
   const anterior = cargados && s.saldo - (suma(cargados.lista, 'compras') - suma(cargados.lista, 'pagos'))
   const Subtitulo = enPanel ? 'h3' : 'h2'
 
-  const puedeAgregar = diaParaAgregar !== undefined && s.activo
+  // Una archivada ya no compra.
+  const puedeAgregar = s.activo
+  // Desde Registrar, o si no hay nada que cobrar, lo principal es anotar.
+  const agregarPrimero = puedeAgregar && (diaParaAgregar !== undefined || s.saldo <= 0)
+  const botonAgregar = puedeAgregar && (
+    <Boton variante={agregarPrimero ? 'tintado' : 'secundario'} onClick={() => abrir(() => setAgregando(true))}>
+      <span aria-hidden="true" className="mr-1 text-2xl leading-none">
+        +
+      </span>
+      Otra compra
+    </Boton>
+  )
   const aFavor = s.saldo < 0
   const Titulo = enPanel ? 'h2' : 'h1'
 
@@ -423,18 +435,11 @@ export function DetallePersona({
           Desde Registrar lo principal es anotar otra compra; desde Cobrar, el pago. */}
       {pagando === null && !agregando && (s.saldo > 0 || puedeAgregar) && (
         <div className="flex flex-wrap gap-3">
-          {puedeAgregar && (
-            <Boton variante="tintado" onClick={() => abrir(() => setAgregando(true))}>
-              <span aria-hidden="true" className="mr-1 text-2xl leading-none">
-                +
-              </span>
-              Otra compra
-            </Boton>
-          )}
+          {agregarPrimero && botonAgregar}
           {s.saldo > 0 && (
             <>
               <Boton
-                variante={puedeAgregar ? 'secundario' : 'tintado'}
+                variante={agregarPrimero ? 'secundario' : 'tintado'}
                 onClick={() => abrir(() => setPagando('total'))}
               >
                 Pagó todo
@@ -444,6 +449,7 @@ export function DetallePersona({
               </Boton>
             </>
           )}
+          {!agregarPrimero && botonAgregar}
         </div>
       )}
       {pagando !== null && (
@@ -455,10 +461,10 @@ export function DetallePersona({
           className="rounded-xl"
         />
       )}
-      {agregando && diaParaAgregar && (
+      {agregando && (
         <AgregarCompra
           nombre={s.nombre}
-          dia={diaParaAgregar}
+          dia={diaParaAgregar ?? hoyBogota()}
           onCancelar={() => setAgregando(false)}
           onGuardar={agregar}
         />
@@ -530,7 +536,7 @@ function AgregarCompra({
   onGuardar,
 }: {
   nombre: string
-  /** El día con que empieza: el que se está registrando. */
+  /** El día con que empieza: el que se está registrando, o hoy. */
   dia: string
   onCancelar: () => void
   onGuardar: (compra: Omit<Correccion, 'quien'>) => Promise<boolean>
