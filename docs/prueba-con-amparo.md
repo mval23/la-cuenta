@@ -1,53 +1,48 @@
 # Prueba de La Cuenta con Amparo
 
-Guion para ver, en el iPad real y en la cocina, si Amparo puede usar la app sola.
-Dura unos 25 minutos. Repetirla una semana después para ver si recuerda el flujo sin ayuda.
+Guía para ver, en el iPad real y en la cocina, si Amparo puede usar la app sola.
 
-En su iPad la app siempre se ve en una sola columna, también en horizontal: la vista
-de lista y detalle lado a lado solo sale en pantallas más grandes.
+Amparo ya usa La Cuenta con los datos reales de la cocina. Por eso la prueba es
+**observarla mientras trabaja**, no pedirle tareas inventadas: todo lo que se anota
+cuenta en Cobrar, en los PDF y en lo que reconoce el dictado.
 
-## Antes de empezar
+## Reglas
 
-- Usar el iPad de Amparo, con la app instalada en la pantalla de inicio (no en Safari).
-- Probar en la cocina, con su luz, sus gafas, su tamaño de texto y en la posición en que lo va a usar.
-- Crear los datos de prueba, justo antes de empezar, desde la terminal en la carpeta del proyecto:
+- **No inventar nada.** Ni compras, ni pagos, ni personas, ni departamentos "de
+  prueba". Solo se observa lo que pasa de verdad.
+- Si algo se anota mal durante la observación, se corrige como siempre: Anular,
+  Deshacer o corregir desde el historial de la persona. Nada se borra.
+- No ayudarle mientras hace algo. Si se queda quieta más de 30 segundos, preguntarle
+  "¿Qué estás buscando?", sin decirle dónde está.
+- Lo que haya que pedirle ("¿cuánto debe…?", "gira el iPad") es solo para mirar, no
+  para anotar.
 
-  ```bash
-  npx supabase db query --linked "$(cat scripts/prueba-preparar.sql)"
-  ```
+## Cuándo
 
-  Crea los departamentos "Prueba" y "Prueba 2" y, en "Prueba", a Carlos Pérez, Carlos Gómez
-  (mismo primer nombre, a propósito) y Marta Ruiz. Carlos Gómez queda debiendo $29.000: dos
-  compras de esta semana y una de hace cuatro meses, para que su historial muestre
-  "Antes del …". Al final muestra lo que quedó.
-- Al terminar, deshacerlo (anula lo anotado y archiva personas y departamentos de prueba):
+- Un día normal de trabajo, a la hora de más movimiento, con su luz, sus gafas, su
+  tamaño de texto y el iPad donde lo usa siempre.
+- Un día de cobro (el 15 o el último del mes) para ver los pagos y el PDF.
+- Repetirla una semana después para ver si recuerda cómo hacer las cosas.
 
-  ```bash
-  npx supabase db query --linked "$(cat scripts/prueba-limpiar.sql)"
-  ```
+## Qué observar
 
-## Cómo observar
+Cada situación se anota cuando pasa sola. Las que no pasen ese día se dejan en blanco:
+no se provocan.
 
-- Leerle cada tarea en voz alta y no ayudarle mientras la hace.
-- Si se queda quieta más de 30 segundos, preguntarle: "¿Qué estás buscando?". No decirle dónde está.
-- Anotar en la tabla de abajo cada duda, cada toque equivocado y cada vez que pregunte algo.
-
-## Tareas
-
-| # | Tarea que se le lee | Qué debe pasar | Qué anotar |
+| # | Situación | Qué debe pasar | Qué mirar |
 |---|---|---|---|
-| 1 | "Entra a la app." | Escribe su PIN. | ¿Se equivoca de tecla? ¿Lee el mensaje si falla? |
-| 2 | "Anota que Carlos Pérez de Prueba se llevó un almuerzo de 12 mil. Díselo al iPad." | Toca el micrófono, habla, revisa la tarjeta y toca Guardar $12.000. | ¿Sabe cuándo terminar de hablar? ¿Se corta si hace una pausa? ¿Lee la tarjeta antes de guardar? |
-| 3 | "Anota 8 mil para Carlos, pero sin hablar." | Toca Anotar a mano, busca a Carlos, elige cuál es, pone el valor y guarda. | ¿Encuentra Anotar a mano? ¿Entiende la pregunta de cuál Carlos es? |
-| 4 | "Anota un tinto de 500 para Carlos Gómez." | Aparece "¿Seguro que son $500?" y decide. | ¿Entiende la pregunta o la salta sin leer? |
-| 5 | "Empieza a anotar 10 mil para Carlos Pérez. Antes de guardar, alguien viene a pagar: ve a Cobrar, anota que Carlos Gómez abonó 5 mil y vuelve a terminar la compra." | Al volver a Registrar la tarjeta sigue ahí, con Carlos Pérez y $10.000. | ¿Encuentra la tarjeta al volver? ¿Cree que ya se había guardado? |
-| 6 | "Te equivocaste en la última compra: bórrala." | Toca Anular en la lista de Hoy y confirma, o usa Deshacer. | ¿Encuentra Anular? ¿Alcanza a ver el aviso de abajo? |
-| 7 | "Carlos Pérez te pagó todo. Anótalo." | Va a Cobrar, lo encuentra y toca Pagó todo, luego Sí, pagó. | ¿Usa el buscador o baja por la lista? ¿Ve el aviso? |
-| 8 | "¿Cuánto debe Carlos Gómez y qué compró? Si te paga ahora, anótalo." | Toca su nombre, lee el historial por quincena y toca Pagó todo ahí mismo. | ¿Explica el saldo con lo que ve (y con "Antes del…" si viene de atrás)? ¿Paga desde el detalle o vuelve a la lista? ¿Sabe volver? |
-| 9 | "Agrega a una persona nueva, Luisa Rojas, en Prueba." | En Cobrar, al final de la lista de Prueba, toca Agregar persona a Prueba, dice o escribe el nombre y toca Agregar. | ¿Toca Cerrar sin agregar? ¿Entiende la pregunta que aparece? |
-| 10 | "Haz el PDF de esta quincena." | En Cobrar baja hasta Documentos de la quincena, toca PDF de la quincena y luego Hacer el PDF y compartir. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
-| 11 | "Gira el iPad y anota otra compra." | Se ve igual, en una columna; el botón Guardar se ve con el teclado abierto. | ¿Se desorienta al girar? |
-| 12 | "Luisa Rojas se pasó a Prueba 2. Cámbiala." | Busca a Luisa, abre su detalle, baja a Datos de Luisa Rojas, toca Cambiar departamento y elige Prueba 2. | ¿Busca esto en Ajustes o en el detalle? ¿Encuentra la sección de abajo? |
+| 1 | Abre la app (en la mañana o tras un rato sin usarla). | Escribe su PIN. | ¿Se equivoca de tecla? ¿Lee el mensaje si falla? |
+| 2 | Llega alguien a comprar y lo anota hablando. | Toca el micrófono, habla, revisa la tarjeta y toca Guardar. | ¿Sabe cuándo terminar de hablar? ¿Se corta si hace una pausa? ¿Lee la tarjeta antes de guardar? |
+| 3 | Anota una compra sin hablar (hay ruido, la voz falla o lo prefiere). | Toca Anotar a mano, busca a la persona, pone el valor y guarda. | ¿Encuentra Anotar a mano? Si hay dos con el mismo nombre, ¿elige bien? |
+| 4 | Aparece "¿Seguro que son $…?" (un valor muy bajo o muy alto). | Lee la pregunta y decide. | ¿La entiende o la salta sin leer? |
+| 5 | La interrumpen mientras anota (alguien viene a pagar). | Al volver a Registrar, la compra a medio anotar sigue ahí. | ¿Encuentra la tarjeta al volver? ¿Cree que ya se había guardado? |
+| 6 | Se equivoca en algo que anotó. | Toca Anular y confirma, o usa Deshacer en el aviso. | ¿Encuentra Anular? ¿Alcanza a ver el aviso de abajo? |
+| 7 | Alguien paga todo o abona. | En Cobrar lo encuentra y toca Pagó todo o Abono. | ¿Usa el buscador o baja por la lista? ¿Entiende la diferencia entre Pagó todo y Abono? |
+| 8 | Alguien pregunta cuánto debe (o pedirle: "¿cuánto debe fulano y qué compró?"). | Abre su detalle y lo explica con el historial por quincena. | ¿Explica el saldo con lo que ve, sin sumar de memoria? ¿Sabe volver? |
+| 9 | Llega alguien nuevo a comprar. | Lo crea al anotar la compra o con Agregar persona en Cobrar. | ¿Toca Cerrar sin agregar? ¿Le salen personas parecidas y las entiende? |
+| 10 | Hace el PDF de la quincena (día de cobro). | En Cobrar, Documentos de la quincena, PDF de la quincena. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
+| 11 | Gira el iPad mientras anota (se le puede pedir). | Se ve igual, en una columna; Guardar se ve con el teclado abierto. | ¿Se desorienta al girar? |
+| 12 | Alguien cambió de departamento. | En el detalle de esa persona, Datos, Cambiar departamento. | ¿Lo busca en Ajustes o en el detalle? ¿Encuentra la sección de abajo? |
 
 ## Preguntas al final
 
@@ -66,16 +61,18 @@ de lista y detalle lado a lado solo sale en pantallas más grandes.
 
 ## Cuándo va bien
 
-- Termina 11 de las 12 tareas sin ayuda.
-- En la tarea 5 no pierde la compra.
-- En la tarea 8 explica el saldo sin sumar de memoria.
+- Lo que pasó ese día lo hizo sola, salvo una cosa como mucho.
+- Si la interrumpieron, no perdió la compra que estaba anotando.
+- Si se le preguntó por un saldo, lo explicó sin sumar de memoria.
 - Califica su confianza en 4 o más.
 
 ## Registro
 
-Se puede anotar en la hoja "Prueba con Amparo" que Mariana tiene en claude.ai (una por ronda: la primera vez y una semana después; calcula sola los criterios de arriba y Claude puede leerla para analizarla), o en esta tabla.
+Se puede anotar en la hoja "Prueba con Amparo" que Mariana tiene en claude.ai (una por
+ronda: la primera vez y una semana después; calcula sola los criterios de arriba y
+Claude puede leerla para analizarla), o en esta tabla. La hoja solo guarda las notas de
+la observación: no toca los datos de la app.
 
-
-| Fecha | Tarea | Lo que pasó | Idea para mejorar |
+| Fecha | Situación | Lo que pasó | Idea para mejorar |
 |---|---|---|---|
 | | | | |
