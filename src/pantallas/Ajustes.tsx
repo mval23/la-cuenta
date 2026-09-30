@@ -4,15 +4,20 @@ import { Boton, BotonVolver } from '../componentes/Boton'
 import { Confirmar } from '../componentes/Confirmar'
 import { useAviso } from '../componentes/useAviso'
 import { olvidarPin } from '../lib/candado'
+import { hoyBogota } from '../lib/fechas'
+import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 import type { Perfil } from '../lib/tipos'
+import { traerVentas } from '../lib/traerVentas'
 import { Departamentos } from './Departamentos'
 import { Personas } from './Personas'
+import { Ventas } from './Ventas'
 
-type Seccion = 'inicio' | 'personas' | 'departamentos'
+type Seccion = 'inicio' | 'ventas' | 'personas' | 'departamentos'
 
 const titulos: Record<Seccion, string> = {
   inicio: 'Ajustes',
+  ventas: 'Ventas',
   personas: 'Personas',
   departamentos: 'Departamentos',
 }
@@ -51,6 +56,7 @@ export function Ajustes({ perfil, activa, inicio }: { perfil: Perfil; activa: bo
       )}
 
       {seccion === 'inicio' && <Inicio perfil={perfil} activa={activa} onIr={ir} />}
+      {seccion === 'ventas' && <Ventas activa={activa} />}
       {seccion === 'personas' && <Personas mostrar={mostrar} onVolver={() => ir('inicio')} />}
       {seccion === 'departamentos' && <Departamentos mostrar={mostrar} />}
 
@@ -69,6 +75,7 @@ function Inicio({
   onIr: (seccion: Seccion) => void
 }) {
   const [cuantas, setCuantas] = useState<{ personas: number; departamentos: number } | null>(null)
+  const [vendidoHoy, setVendidoHoy] = useState<number | null>(null)
   const [saliendo, setSaliendo] = useState(false)
 
   // Se cuentan de nuevo al volver: al registrar se pueden crear personas.
@@ -80,9 +87,18 @@ function Inicio({
     ]).then(([p, d]) => {
       if (p.count !== null && d.count !== null) setCuantas({ personas: p.count, departamentos: d.count })
     })
+    const hoy = hoyBogota()
+    traerVentas(hoy, hoy).then((compras) => {
+      if (compras) setVendidoHoy(compras.reduce((total, c) => total + c.valor_pesos, 0))
+    })
   }, [activa])
 
   const filas: { seccion: Seccion; titulo: string; detalle: string }[] = [
+    {
+      seccion: 'ventas',
+      titulo: 'Ventas',
+      detalle: vendidoHoy !== null ? `Hoy ${formatearPesos(vendidoHoy)} · por día y por quincena` : 'Por día y por quincena',
+    },
     {
       seccion: 'personas',
       titulo: 'Personas',
