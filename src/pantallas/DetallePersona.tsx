@@ -314,7 +314,8 @@ export function DetallePersona({
     const clasesRenglon = 'flex min-w-0 flex-1 items-center gap-3 py-2 pl-4 text-left'
     return (
       <li key={m.clave}>
-        <div className="flex items-center gap-3 pr-3">
+        {/* Los pagos van sobre verde para distinguirlos de las compras de un vistazo. */}
+        <div className={`flex items-center gap-3 pr-3 ${esPago && !m.anulado ? 'bg-exito-suave' : ''}`}>
           {/* Lo anulado no se corrige: primero se recupera con Deshacer. */}
           {m.anulado ? (
             <div className={clasesRenglon}>{contenido}</div>
