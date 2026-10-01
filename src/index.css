@@ -12,6 +12,7 @@
  *   aviso    advertencias que piden revisar ("¿Seguro?", "Falta")
  *   peligro  anular y errores
  *   info     datos útiles que no son un problema
+ *   especial almuerzos especiales: salen aparte de lo normal
  */
 @theme {
   --color-marca: #1d5fa8;
@@ -41,6 +42,8 @@
   --color-peligro-linea: #c9564b;
   --color-info: #154a87;
   --color-info-suave: #e8f0fa;
+  --color-especial: #5b2a9e;
+  --color-especial-suave: #f1eafb;
 
   /* "Deshacer" sobre el aviso oscuro. */
   --color-destello: #ffd166;

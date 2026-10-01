@@ -13,6 +13,7 @@ describe('pdfDeQuincena', () => {
     departamento: 'TDH',
     anterior: 0,
     comprado: 12000,
+    especiales: 0,
     pagado: 0,
     saldo: 12000,
     ...cambios,
@@ -20,7 +21,11 @@ describe('pdfDeQuincena', () => {
 
   it('arma el PDF con el nombre de la quincena', async () => {
     const pdf = await pdfDeQuincena(
-      [fila({}), fila({ persona_id: 2, nombre: 'Luis', saldo: -5000, anterior: -5000, comprado: 0 })],
+      [
+        fila({}),
+        fila({ persona_id: 3, nombre: 'Israel', comprado: 27000, especiales: 15000, saldo: 27000 }),
+        fila({ persona_id: 2, nombre: 'Luis', saldo: -5000, anterior: -5000, comprado: 0 }),
+      ],
       { desde: '2026-09-16', hasta: '2026-09-30' },
       '2026-09-18',
     )

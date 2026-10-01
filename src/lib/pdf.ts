@@ -53,6 +53,13 @@ function numerarPaginas(doc: jsPDF) {
 /** Una persona en la quincena: ver cuenta_de_quincena() en la base. */
 export interface FilaDeQuincena extends Omit<Saldo, 'activo'> {
   anterior: number
+  /** La parte de `comprado` que fue de almuerzos especiales. */
+  especiales: number
+}
+
+/** Lo comprado en la quincena; en blanco si nada. */
+function compradoEnTabla(valor: number): string {
+  return valor === 0 ? '' : formatearPesos(valor)
 }
 
 /** Lo que alguien venía debiendo o tenía a favor, dicho corto. */
@@ -102,10 +109,17 @@ export async function pdfDeQuincena(filas: FilaDeQuincena[], q: Quincena, hoy: s
       startY: y + 3,
       // Arriba queda espacio para repetir el título si la tabla sigue en otra hoja.
       margin: { top: MARGEN + 7, left: MARGEN, right: MARGEN, bottom: 16 },
-      head: [['Nombre', 'Venía debiendo', 'Debe']],
+      // Lo normal y los almuerzos especiales de la quincena van aparte; "Debe" es el total.
+      head: [['Nombre', 'Venía debiendo', 'Normal', 'Especiales', 'Debe']],
       body: g.personas.map((s): RowInput => {
         const f = porFila.get(s.persona_id)!
-        return [f.nombre, saldoEnTabla(f.anterior), { content: saldoEnTabla(f.saldo), styles: { fontStyle: 'bold' } }]
+        return [
+          f.nombre,
+          saldoEnTabla(f.anterior),
+          compradoEnTabla(f.comprado - f.especiales),
+          compradoEnTabla(f.especiales),
+          { content: saldoEnTabla(f.saldo), styles: { fontStyle: 'bold' } },
+        ]
       }),
       // Sin color, como la cuenta de cobro.
       theme: 'grid',
@@ -120,8 +134,10 @@ export async function pdfDeQuincena(filas: FilaDeQuincena[], q: Quincena, hoy: s
       },
       headStyles: { fillColor: false, fontStyle: 'bold' },
       columnStyles: {
-        1: { halign: 'right', cellWidth: 40 },
-        2: { halign: 'right', cellWidth: 40 },
+        1: { halign: 'right', cellWidth: 34 },
+        2: { halign: 'right', cellWidth: 28 },
+        3: { halign: 'right', cellWidth: 28 },
+        4: { halign: 'right', cellWidth: 34 },
       },
       didParseCell: ({ section, column, cell }) => {
         if (section === 'head' && column.index > 0) cell.styles.halign = 'right'

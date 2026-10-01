@@ -3,7 +3,7 @@ import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { fechaLarga, hoyBogota, inicioDeQuincenas, nombreDeQuincena } from '../lib/fechas'
 import { formatearPesos } from '../lib/pesos'
 import { traerVentas } from '../lib/traerVentas'
-import { resumirVentas, type Ventas as DatosVentas } from '../lib/ventas'
+import { resumirVentas, type Vendido, type Ventas as DatosVentas } from '../lib/ventas'
 
 // Las quincenas de antes que se ven debajo de la de hoy (unos tres meses en total).
 const QUINCENAS_ANTERIORES = 5
@@ -45,6 +45,25 @@ export function Ventas({ activa }: { activa: boolean }) {
   return <ResumenDeVentas ventas={ventas} />
 }
 
+/** Debajo del total: cuánto fue normal y cuánto de almuerzos especiales. Sin especiales, nada. */
+function NormalYEspeciales({ vendido }: { vendido: Vendido }) {
+  if (vendido.cuantosEspeciales === 0) return null
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 border-t border-linea pt-3 text-lg text-tinta-suave">
+      <p>
+        Normal
+        <span className="block text-2xl font-bold text-tinta tabular-nums">
+          {formatearPesos(vendido.total - vendido.especiales)}
+        </span>
+      </p>
+      <p>
+        {vendido.cuantosEspeciales === 1 ? '1 especial' : `${vendido.cuantosEspeciales} especiales`}
+        <span className="block text-2xl font-bold text-especial tabular-nums">{formatearPesos(vendido.especiales)}</span>
+      </p>
+    </div>
+  )
+}
+
 function ResumenDeVentas({ ventas }: { ventas: DatosVentas }) {
   const mayor = Math.max(1, ...ventas.dias.map((d) => d.total))
 
@@ -54,14 +73,16 @@ function ResumenDeVentas({ ventas }: { ventas: DatosVentas }) {
         <p className="text-lg text-tinta-suave">Hoy, {fechaLarga(ventas.hoy.fecha)}</p>
         <p className="text-5xl font-bold tabular-nums">{formatearPesos(ventas.hoy.total)}</p>
         <p className="text-lg text-tinta-suave">{cuantasCompras(ventas.hoy.compras)}</p>
+        <NormalYEspeciales vendido={ventas.hoy} />
       </div>
 
       <div className="rounded-xl border border-linea bg-superficie px-5 py-4">
         <p className="text-lg text-tinta-suave">Esta quincena, del {nombreDeQuincena(ventas.quincena)}</p>
-        <p className="text-5xl font-bold tabular-nums">{formatearPesos(ventas.totalQuincena)}</p>
+        <p className="text-5xl font-bold tabular-nums">{formatearPesos(ventas.totalQuincena.total)}</p>
         <p className="text-lg text-tinta-suave">
           {ventas.dias.length === 1 ? '1 día con ventas' : `${ventas.dias.length} días con ventas`}
         </p>
+        <NormalYEspeciales vendido={ventas.totalQuincena} />
       </div>
 
       {ventas.dias.length > 0 && (

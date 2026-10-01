@@ -6,6 +6,7 @@ import { ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { BuscarPersona, type Quien } from '../componentes/BuscarPersona'
 import { DatosDePersona } from '../componentes/DatosDePersona'
+import { BotonEspecial, EtiquetaEspecial, FranjaEspecial } from '../componentes/Especial'
 import { campo, etiqueta } from '../componentes/estilos'
 import { PanelDePago } from '../componentes/Pago'
 import { fechaLarga, hoyBogota, inicioDeQuincenas, nombreDeQuincena, quincenaDe, type Quincena } from '../lib/fechas'
@@ -35,6 +36,8 @@ interface Movimiento {
   anulado: boolean
   /** Qué llevó; solo en compras, y puede faltar. */
   descripcion: string | null
+  /** Almuerzo especial; solo en compras. */
+  especial: boolean
   /** Lo que hace falta para anotarlo de nuevo al corregirlo. */
   copia: Record<string, unknown>
 }
@@ -45,6 +48,7 @@ interface Correccion {
   valor: number
   fecha: string
   descripcion: string | null
+  especial: boolean
 }
 
 const formatoFecha = new Intl.DateTimeFormat('es-CO', {
@@ -119,7 +123,7 @@ export function DetallePersona({
     const [compras, pagos] = await Promise.all([
       supabase
         .from('compras')
-        .select('id, fecha, creada_en, descripcion, texto_original, valor_pesos, anulada, anulada_motivo')
+        .select('id, fecha, creada_en, descripcion, texto_original, valor_pesos, especial, anulada, anulada_motivo')
         .eq('persona_id', s.persona_id)
         .gte('fecha', desde),
       supabase
@@ -148,6 +152,7 @@ export function DetallePersona({
             valor: c.valor_pesos,
             anulado: c.anulada,
             descripcion: c.descripcion,
+            especial: c.especial,
             copia: { descripcion: c.descripcion, texto_original: c.texto_original },
           })),
         ...pagos.data
@@ -162,6 +167,7 @@ export function DetallePersona({
             valor: p.valor_pesos,
             anulado: p.anulado,
             descripcion: null,
+            especial: false,
             copia: { tipo: p.tipo },
           })),
         // Por día, y dentro del día lo último primero: lo corregido queda en su día.
@@ -199,14 +205,14 @@ export function DetallePersona({
   }
 
   /** Anota uno nuevo con lo corregido y anula el viejo. */
-  async function corregir(m: Movimiento, { quien, valor, fecha, descripcion }: Correccion): Promise<boolean> {
+  async function corregir(m: Movimiento, { quien, valor, fecha, descripcion, especial }: Correccion): Promise<boolean> {
     const que = m.tabla === 'pagos' ? 'el pago' : 'la compra'
     const aOtra = quien.id !== s.persona_id
     const { data: nuevo, error } = await supabase
       .from(m.tabla)
       .insert({
         ...m.copia,
-        ...(m.tabla === 'compras' ? { descripcion } : {}),
+        ...(m.tabla === 'compras' ? { descripcion, especial } : {}),
         persona_id: quien.id,
         valor_pesos: valor,
         fecha,
@@ -256,6 +262,7 @@ export function DetallePersona({
         descripcion: compra.descripcion,
         valor_pesos: compra.valor,
         fecha: compra.fecha,
+        especial: compra.especial,
       })
       .select('id')
       .single()
@@ -268,7 +275,7 @@ export function DetallePersona({
     mostrar({
       tipo: 'ok',
       texto:
-        `Guardado: ${[s.nombre, compra.descripcion, formatearPesos(compra.valor)].filter(Boolean).join(', ')}` +
+        `Guardado: ${[s.nombre, compra.especial && 'almuerzo especial', compra.descripcion, formatearPesos(compra.valor)].filter(Boolean).join(', ')}` +
         (compra.fecha === hoyBogota() ? '' : `, ${fechaCorta(compra.fecha)}`),
       deshacer: async () => {
         const { error: errorDeshacer } = await supabase.from('compras').update({ anulada: true }).eq('id', data.id)
@@ -290,6 +297,7 @@ export function DetallePersona({
   /** Una compra o un pago del historial: se toca para corregirlo. */
   function renglon(m: Movimiento) {
     const esPago = m.tabla === 'pagos'
+    const esEspecial = m.especial && !m.anulado
     const contenido = (
       <>
         <div className={`min-w-0 flex-1 ${m.anulado ? 'text-tinta-tenue line-through' : ''}`}>
@@ -298,7 +306,14 @@ export function DetallePersona({
           <p
             className={`text-base ${esPago && !m.anulado ? 'font-semibold text-exito' : m.anulado ? '' : 'text-tinta-suave'}`}
           >
-            {m.texto}
+            {esEspecial ? (
+              <>
+                <EtiquetaEspecial />
+                {m.descripcion}
+              </>
+            ) : (
+              m.texto
+            )}
           </p>
         </div>
         <span
@@ -314,8 +329,10 @@ export function DetallePersona({
     const clasesRenglon = 'flex min-w-0 flex-1 items-center gap-3 py-2 pl-4 text-left'
     return (
       <li key={m.clave}>
-        {/* Los pagos van sobre verde para distinguirlos de las compras de un vistazo. */}
-        <div className={`flex items-center gap-3 pr-3 ${esPago && !m.anulado ? 'bg-exito-suave' : ''}`}>
+        {/* Los pagos van sobre verde y los especiales sobre morado: se distinguen de un vistazo. */}
+        <div
+          className={`flex items-center gap-3 pr-3 ${esPago && !m.anulado ? 'bg-exito-suave' : esEspecial ? 'bg-especial-suave' : ''}`}
+        >
           {/* Lo anulado no se corrige: primero se recupera con Deshacer. */}
           {m.anulado ? (
             <div className={clasesRenglon}>{contenido}</div>
@@ -372,6 +389,7 @@ export function DetallePersona({
 
   const suma = (lista: Movimiento[], tabla: Movimiento['tabla']) =>
     lista.filter((m) => !m.anulado && m.tabla === tabla).reduce((total, m) => total + m.valor, 0)
+  const sumaEspeciales = (lista: Movimiento[]) => suma(lista.filter((m) => m.especial), 'compras')
   // Por quincena, de la más reciente a la más vieja (la lista ya viene así).
   const grupos: { quincena: Quincena; lista: Movimiento[] }[] = []
   for (const m of movimientos ?? []) {
@@ -483,15 +501,26 @@ export function DetallePersona({
           )}
           {grupos.map((g) => {
             const compro = suma(g.lista, 'compras')
+            const especiales = sumaEspeciales(g.lista)
             const pago = suma(g.lista, 'pagos')
+            // Con especiales, lo normal y lo especial van aparte.
+            const partes = [
+              especiales > 0
+                ? compro > especiales && <span key="n">Normal {formatearPesos(compro - especiales)}</span>
+                : compro > 0 && <span key="c">Compró {formatearPesos(compro)}</span>,
+              especiales > 0 && (
+                <span key="e" className="font-semibold text-especial">
+                  Especiales {formatearPesos(especiales)}
+                </span>
+              ),
+              pago > 0 && <span key="p">Pagó {formatearPesos(pago)}</span>,
+            ].filter(Boolean)
             return (
               <div key={g.quincena.desde} className="flex flex-col gap-2">
                 <Subtitulo className="flex flex-wrap items-baseline justify-between gap-x-4 text-lg font-semibold">
                   <span>Del {nombreDeQuincena(g.quincena)}</span>
                   <span className="text-lg font-normal text-tinta-suave tabular-nums">
-                    {[compro > 0 && `Compró ${formatearPesos(compro)}`, pago > 0 && `Pagó ${formatearPesos(pago)}`]
-                      .filter(Boolean)
-                      .join(' · ')}
+                    {partes.flatMap((parte, i) => (i === 0 ? [parte] : [' · ', parte]))}
                   </span>
                 </Subtitulo>
                 <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
@@ -545,6 +574,8 @@ function AgregarCompra({
   const [valor, setValor] = useState('')
   const [fecha, setFecha] = useState(dia)
   const [queLlevo, setQueLlevo] = useState('')
+  // Siempre empieza normal; lo especial se marca a propósito.
+  const [especial, setEspecial] = useState(false)
   const [guardando, setGuardando] = useState(false)
   // Un valor raro (casi siempre un "mil" que falta) se confirma antes de guardar.
   const [preguntando, setPreguntando] = useState(false)
@@ -562,12 +593,13 @@ function AgregarCompra({
     }
     setGuardando(true)
     // Si salió bien, este formulario se cierra solo.
-    if (!(await onGuardar({ valor: numero, fecha, descripcion: queLlevo.trim() || null }))) setGuardando(false)
+    if (!(await onGuardar({ valor: numero, fecha, descripcion: queLlevo.trim() || null, especial }))) setGuardando(false)
   }
 
   return (
     <form onSubmit={guardar} className="flex flex-col gap-4 rounded-xl border border-linea bg-superficie p-4 shadow-sm">
       <p className="text-xl font-semibold">Otra compra de {nombre}</p>
+      {especial && <FranjaEspecial onQuitar={() => setEspecial(false)} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
           <span className={etiqueta}>Cuánto</span>
@@ -608,6 +640,11 @@ function AgregarCompra({
           className={`${campo} text-xl`}
         />
       </label>
+      {!especial && (
+        <div className="-my-2 -ml-4 self-start">
+          <BotonEspecial onClick={() => setEspecial(true)} />
+        </div>
+      )}
       {preguntando ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-aviso-suave p-4">
           <div className="mr-auto">
@@ -661,20 +698,26 @@ function Editar({
   const [valor, setValor] = useState(String(m.valor))
   const [fecha, setFecha] = useState(m.fecha)
   const [queLlevo, setQueLlevo] = useState(m.descripcion ?? '')
+  const [especial, setEspecial] = useState(m.especial)
   const [quien, setQuien] = useState(persona)
   const [cambiandoQuien, setCambiandoQuien] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const hoy = hoyBogota()
   const numero = Number(valor)
   const descripcion = queLlevo.trim() || null
-  const sinCambios = numero === m.valor && fecha === m.fecha && descripcion === m.descripcion && quien.id === persona.id
+  const sinCambios =
+    numero === m.valor &&
+    fecha === m.fecha &&
+    descripcion === m.descripcion &&
+    especial === m.especial &&
+    quien.id === persona.id
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
     if (!(numero > 0) || sinCambios || guardando) return
     setGuardando(true)
     // Si salió bien, este formulario se cierra solo.
-    if (!(await onGuardar({ quien, valor: numero, fecha, descripcion }))) setGuardando(false)
+    if (!(await onGuardar({ quien, valor: numero, fecha, descripcion, especial }))) setGuardando(false)
   }
 
   return (
@@ -700,6 +743,14 @@ function Editar({
           </div>
         )}
       </div>
+      {m.tabla === 'compras' &&
+        (especial ? (
+          <FranjaEspecial onQuitar={() => setEspecial(false)} />
+        ) : (
+          <div className="-my-2 -ml-4 self-start">
+            <BotonEspecial onClick={() => setEspecial(true)} />
+          </div>
+        ))}
       {m.tabla === 'compras' && (
         <label className="flex flex-col gap-2">
           <span className={etiqueta}>Qué llevó (si quieres)</span>

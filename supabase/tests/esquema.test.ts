@@ -266,6 +266,23 @@ describe('documentos', () => {
     })
   })
 
+  it('los almuerzos especiales se suman a la deuda y también salen aparte', async () => {
+    await como(OPERADOR, async () => {
+      const [p] = await filas(`insert into personas (nombre, departamento_id)
+                               select 'Israel', departamento_id from personas where id = ${ana} returning id`)
+      await db.query(`insert into compras (persona_id, valor_pesos) values (${p.id}, 4400)`)
+      await db.query(`insert into compras (persona_id, valor_pesos, especial) values (${p.id}, 15000, true)`)
+      await db.query(`insert into compras (persona_id, valor_pesos, especial, anulada) values (${p.id}, 999, true, true)`)
+      const [c] = await filas(`select * from cuenta_de_quincena(public.hoy_bogota(), public.hoy_bogota())
+                               where persona_id = ${p.id}`)
+      expect([c.comprado, c.especiales, c.saldo].map(Number)).toEqual([19400, 15000, 19400])
+      const marcadas = await filas(`select especial from compras where persona_id = ${p.id} and not anulada order by valor_pesos`)
+      expect(marcadas.map((m) => m.especial)).toEqual([false, true])
+      // Como el valor, no se cambia: se corrige anotando otra.
+      await expect(db.query(`update compras set especial = false where persona_id = ${p.id}`)).rejects.toThrow()
+    })
+  })
+
   it('la cocina y quien no tiene perfil no ven la cuenta de la quincena', async () => {
     for (const uid of [COCINA, SIN_PERFIL]) {
       await como(uid, async () => {
@@ -306,6 +323,7 @@ describe('unir personas', () => {
         (${raybin}, 4000, null, public.hoy_bogota()),
         (${reibi}, 10000, 'almuerzo', public.hoy_bogota() - 1),
         (${reibi}, 7000, null, public.hoy_bogota())`)
+      await db.query(`insert into compras (persona_id, valor_pesos, especial) values (${reibi}, 15000, true)`)
       await db.query(`update compras set anulada = true where persona_id = ${reibi} and valor_pesos = 7000`)
       await db.query(`insert into pagos (persona_id, valor_pesos, tipo) values (${reibi}, 3000, 'abono')`)
 
@@ -313,16 +331,18 @@ describe('unir personas', () => {
 
       const saldo = await filas(`select persona_id, saldo, activo from saldos where persona_id in (${raybin}, ${reibi})`)
       expect(saldo.find((s) => s.persona_id === raybin)).toMatchObject({ activo: true })
-      expect(Number(saldo.find((s) => s.persona_id === raybin)!.saldo)).toBe(4000 + 10000 - 3000)
+      expect(Number(saldo.find((s) => s.persona_id === raybin)!.saldo)).toBe(4000 + 10000 + 15000 - 3000)
       expect(saldo.find((s) => s.persona_id === reibi)).toMatchObject({ activo: false })
       expect(Number(saldo.find((s) => s.persona_id === reibi)!.saldo)).toBe(0)
 
       const [pasada] = await filas(`select descripcion, fecha = public.hoy_bogota() - 1 as ayer, creada_por
                                     from compras where persona_id = ${raybin} and valor_pesos = 10000`)
       expect(pasada).toEqual({ descripcion: 'almuerzo', ayer: true, creada_por: OPERADOR })
+      const [especial] = await filas(`select especial from compras where persona_id = ${raybin} and valor_pesos = 15000`)
+      expect(especial.especial).toBe(true)
       const motivos = await filas(`select anulada_motivo from compras where persona_id = ${reibi} order by valor_pesos`)
-      // La anulada antes queda como estaba; la otra se anula como corregida.
-      expect(motivos.map((m) => m.anulada_motivo)).toEqual([null, 'corregida'])
+      // La anulada antes queda como estaba; las otras se anulan como corregidas.
+      expect(motivos.map((m) => m.anulada_motivo)).toEqual([null, 'corregida', 'corregida'])
     })
   })
 

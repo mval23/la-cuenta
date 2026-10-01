@@ -5,6 +5,7 @@ import { Boton } from '../componentes/Boton'
 import { Confirmar } from '../componentes/Confirmar'
 import { Calendario, ElegirDia } from '../componentes/ElegirDia'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
+import { BotonEspecial, EtiquetaEspecial, FranjaEspecial } from '../componentes/Especial'
 import { campo, etiqueta } from '../componentes/estilos'
 import { Microfono } from '../componentes/Microfono'
 import { Parecidas } from '../componentes/Parecidas'
@@ -28,6 +29,8 @@ interface Borrador {
   valor: string
   /** El día de la compra, "2026-09-15". */
   fecha: string
+  /** Almuerzo especial: sale aparte. Siempre empieza en false; por voz no se marca. */
+  especial: boolean
 }
 
 interface CompraDelDia {
@@ -35,6 +38,7 @@ interface CompraDelDia {
   persona_id: number
   descripcion: string | null
   valor_pesos: number
+  especial: boolean
   anulada: boolean
   creada_en: string
   personas: { nombre: string } | null
@@ -124,7 +128,9 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
   const cargarCompras = useCallback(async () => {
     const { data } = await supabase
       .from('compras')
-      .select('id, persona_id, descripcion, valor_pesos, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)')
+      .select(
+        'id, persona_id, descripcion, valor_pesos, especial, anulada, creada_en, personas!inner(nombre, activo), departamentos(nombre)',
+      )
       // Las que se corrigieron en el historial ya tienen su reemplazo en la lista.
       .or(`anulada_motivo.is.null,anulada_motivo.neq.${MOTIVO_CORREGIDA}`)
       .eq('fecha', dia)
@@ -199,6 +205,7 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
       descripcion: lectura.descripcion,
       valor: lectura.valor ? String(lectura.valor) : '',
       fecha,
+      especial: false,
     })
   }
 
@@ -215,6 +222,7 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
       descripcion: '',
       valor: '',
       fecha: dia,
+      especial: false,
     })
   }
 
@@ -233,6 +241,7 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
         valor_pesos: Number(b.valor),
         texto_original: b.textoOriginal || null,
         fecha: b.fecha,
+        especial: b.especial,
       })
       .select('id')
       .single()
@@ -246,7 +255,7 @@ export function Registrar({ perfil, activa, inicio }: { perfil: Perfil; activa: 
     mostrar({
       tipo: 'ok',
       texto:
-        `Guardado: ${[nombre, b.descripcion.trim(), formatearPesos(Number(b.valor))].filter(Boolean).join(', ')}` +
+        `Guardado: ${[nombre, b.especial && 'almuerzo especial', b.descripcion.trim(), formatearPesos(Number(b.valor))].filter(Boolean).join(', ')}` +
         sufijoDelDia(b.fecha, hoyAhora),
       deshacer: puedeAnular ? () => cambiarAnulada(data.id, true, 'Se deshizo la compra.') : undefined,
     })
@@ -737,6 +746,8 @@ function Confirmacion({
         )}
       </div>
 
+      {b.especial && <FranjaEspecial onQuitar={() => cambiar({ especial: false })} />}
+
       {/* Cuánto y qué día */}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
@@ -778,7 +789,7 @@ function Confirmacion({
       </div>
 
       {/* Qué llevó: opcional */}
-      {conDescripcion ? (
+      {conDescripcion && (
         <label className="flex flex-col gap-2">
           <span className={etiqueta}>
             Qué llevó <span className="font-normal">(opcional)</span>
@@ -791,10 +802,17 @@ function Confirmacion({
             className={campo}
           />
         </label>
-      ) : (
-        <Boton variante="texto" compacto className="-my-2 -ml-4 self-start" onClick={() => setConDescripcion(true)}>
-          + Anotar qué llevó
-        </Boton>
+      )}
+      {(!conDescripcion || !b.especial) && (
+        <div className="-my-2 -ml-4 flex flex-wrap gap-x-4 self-start">
+          {!conDescripcion && (
+            <Boton variante="texto" compacto onClick={() => setConDescripcion(true)}>
+              + Anotar qué llevó
+            </Boton>
+          )}
+          {/* Escondido a propósito: casi todo es normal. */}
+          {!b.especial && <BotonEspecial onClick={() => cambiar({ especial: true })} />}
+        </div>
       )}
     </form>
   )
@@ -882,6 +900,7 @@ function ComprasDelDia({
                     <span className={c.anulada ? '' : 'text-tinta-suave'}>· {c.departamentos?.nombre}</span>
                   </p>
                   <p className={`text-base ${c.anulada ? '' : 'text-tinta-suave'}`}>
+                    {c.especial && !c.anulada && <EtiquetaEspecial />}
                     {c.descripcion && `${c.descripcion} · `}
                     {dia === hoy ? hora(c.creada_en) : `anotada a las ${hora(c.creada_en)}`}
                   </p>
