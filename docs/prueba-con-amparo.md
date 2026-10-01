@@ -40,7 +40,7 @@ no se provocan.
 | 7 | Alguien paga todo o abona. | En Cobrar lo encuentra y toca Pagó todo o Abono. | ¿Usa el buscador o baja por la lista? ¿Entiende la diferencia entre Pagó todo y Abono? |
 | 8 | Alguien pregunta cuánto debe (o pedirle: "¿cuánto debe fulano y qué compró?"). | Abre su detalle y lo explica con el historial por quincena. | ¿Explica el saldo con lo que ve, sin sumar de memoria? ¿Sabe volver? |
 | 9 | Llega alguien nuevo a comprar. | Lo crea al anotar la compra o con Agregar persona en Cobrar. | ¿Toca Cerrar sin agregar? ¿Le salen personas parecidas y las entiende? |
-| 10 | Hace el PDF de la quincena (día de cobro). | En Cobrar, Documentos de la quincena, PDF de la quincena. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
+| 10 | Hace el PDF de la quincena (día de cobro). | En Cobrar, arriba, PDF de la quincena. | ¿Encuentra el botón? ¿Entiende el menú de compartir? |
 | 11 | Gira el iPad mientras anota (se le puede pedir). | Se ve igual, en una columna; Guardar se ve con el teclado abierto. | ¿Se desorienta al girar? |
 | 12 | Alguien cambió de departamento. | En el detalle de esa persona, Datos, Cambiar departamento. | ¿Lo busca en Ajustes o en el detalle? ¿Encuentra la sección de abajo? |
 

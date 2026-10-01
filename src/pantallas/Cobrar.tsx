@@ -217,6 +217,16 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
         </p>
       </div>
 
+      {/* Arriba, para no tener que bajar toda la lista para encontrarlos. */}
+      <div className="flex flex-wrap gap-3">
+        <Boton variante="secundario" onClick={() => irA('quincena')}>
+          PDF de la quincena
+        </Boton>
+        <Boton variante="secundario" onClick={() => irA('cuentaDeCobro')}>
+          Cuenta de cobro
+        </Boton>
+      </div>
+
       <label className="flex flex-col gap-1">
         <span className={etiqueta}>Buscar persona o departamento</span>
         <input
@@ -306,18 +316,6 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
           </ul>
         </div>
       )}
-
-      <div className="flex flex-col gap-2 border-t border-linea pt-5">
-        <h2 className="text-xl font-semibold">Documentos de la quincena</h2>
-        <div className="flex flex-wrap gap-3">
-          <Boton variante="secundario" onClick={() => irA('quincena')}>
-            PDF de la quincena
-          </Boton>
-          <Boton variante="secundario" onClick={() => irA('cuentaDeCobro')}>
-            Cuenta de cobro
-          </Boton>
-        </div>
-      </div>
 
       <div className="flex flex-col gap-3 border-t border-linea pt-5">
         <NuevoDepartamento mostrar={mostrar} onAgregado={cargar} />
