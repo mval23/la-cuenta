@@ -68,6 +68,40 @@ function saldoEnTabla(valor: number): string {
   return valor < 0 ? `A favor ${formatearPesos(-valor)}` : formatearPesos(valor)
 }
 
+/** Lo que va arriba de la cuenta de la quincena. */
+export function encabezadoDeQuincena(q: Quincena, hoy: string) {
+  return {
+    titulo: 'Cuentas por cobrar',
+    quincena: `Quincena del ${nombreDeQuincena(q)}`,
+    hecho: `Hecho el ${fechaLarga(hoy)}`,
+    nadie: 'Nadie debe en esta quincena.',
+  }
+}
+
+// Lo normal y los almuerzos especiales de la quincena van aparte; "Debe" es el total.
+export const COLUMNAS_DE_QUINCENA = ['Nombre', 'Venía debiendo', 'Normal', 'Especiales', 'Debe']
+
+/**
+ * Las tablas de la cuenta de la quincena, una por departamento, ya escritas
+ * como van en el PDF. La vista previa de la app usa estas mismas.
+ */
+export function tablasDeQuincena(filas: FilaDeQuincena[]): { departamento: string; filas: string[][] }[] {
+  const porFila = new Map(filas.map((f) => [f.persona_id, f]))
+  return agruparParaCobro(filas.map((f) => ({ ...f, activo: true }))).map((g) => ({
+    departamento: g.departamento.toUpperCase(),
+    filas: g.personas.map((s) => {
+      const f = porFila.get(s.persona_id)!
+      return [
+        f.nombre,
+        saldoEnTabla(f.anterior),
+        compradoEnTabla(f.comprado - f.especiales),
+        compradoEnTabla(f.especiales),
+        saldoEnTabla(f.saldo),
+      ]
+    }),
+  }))
+}
+
 /**
  * La lista de quién debe cuánto en la quincena, por departamento. Solo quien
  * debe o tiene saldo a favor al terminar la quincena.
@@ -78,30 +112,30 @@ export async function pdfDeQuincena(filas: FilaDeQuincena[], q: Quincena, hoy: s
   const ancho = doc.internal.pageSize.width
   const alto = doc.internal.pageSize.height
   const centro = ancho / 2
-  const grupos = agruparParaCobro(filas.map((f) => ({ ...f, activo: true })))
-  const porFila = new Map(filas.map((f) => [f.persona_id, f]))
+  const tablas = tablasDeQuincena(filas)
+  const arriba = encabezadoDeQuincena(q, hoy)
 
   doc.setTextColor(...TINTA).setFont('helvetica', 'bold').setFontSize(18)
-  doc.text('Cuentas por cobrar', centro, MARGEN + 4, { align: 'center' })
+  doc.text(arriba.titulo, centro, MARGEN + 4, { align: 'center' })
   doc.setFont('helvetica', 'normal').setFontSize(12)
-  doc.text(`Quincena del ${nombreDeQuincena(q)}`, centro, MARGEN + 11, { align: 'center' })
+  doc.text(arriba.quincena, centro, MARGEN + 11, { align: 'center' })
   doc.setFontSize(10).setTextColor(...TINTA_SUAVE)
-  doc.text(`Hecho el ${fechaLarga(hoy)}`, centro, MARGEN + 17, { align: 'center' })
+  doc.text(arriba.hecho, centro, MARGEN + 17, { align: 'center' })
   doc.setTextColor(...TINTA)
 
   let y = MARGEN + 30
-  if (grupos.length === 0) {
-    doc.setFontSize(12).text('Nadie debe en esta quincena.', centro, y, { align: 'center' })
+  if (tablas.length === 0) {
+    doc.setFontSize(12).text(arriba.nadie, centro, y, { align: 'center' })
   }
 
   // Una tabla por departamento, con su nombre como título.
-  for (const g of grupos) {
+  for (const t of tablas) {
     // El título no queda solo al final de la hoja: va con al menos un par de renglones.
     if (y + 30 > alto - 16) {
       doc.addPage()
       y = MARGEN + 4
     }
-    const titulo = g.departamento.toUpperCase()
+    const titulo = t.departamento
     doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(...TINTA)
     doc.text(titulo, centro, y, { align: 'center' })
 
@@ -109,18 +143,9 @@ export async function pdfDeQuincena(filas: FilaDeQuincena[], q: Quincena, hoy: s
       startY: y + 3,
       // Arriba queda espacio para repetir el título si la tabla sigue en otra hoja.
       margin: { top: MARGEN + 7, left: MARGEN, right: MARGEN, bottom: 16 },
-      // Lo normal y los almuerzos especiales de la quincena van aparte; "Debe" es el total.
-      head: [['Nombre', 'Venía debiendo', 'Normal', 'Especiales', 'Debe']],
-      body: g.personas.map((s): RowInput => {
-        const f = porFila.get(s.persona_id)!
-        return [
-          f.nombre,
-          saldoEnTabla(f.anterior),
-          compradoEnTabla(f.comprado - f.especiales),
-          compradoEnTabla(f.especiales),
-          { content: saldoEnTabla(f.saldo), styles: { fontStyle: 'bold' } },
-        ]
-      }),
+      head: [COLUMNAS_DE_QUINCENA],
+      // "Debe" va en negrilla.
+      body: t.filas.map((f): RowInput => [...f.slice(0, -1), { content: f.at(-1)!, styles: { fontStyle: 'bold' } }]),
       // Sin color, como la cuenta de cobro.
       theme: 'grid',
       rowPageBreak: 'avoid',

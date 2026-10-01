@@ -2,9 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { BotonVolver } from '../componentes/Boton'
 import { BotonPdf } from '../componentes/BotonPdf'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
-import { agruparParaCobro } from '../lib/cobro'
 import { hoyBogota, nombreDeQuincena, quincenaDe, quincenaVecina, type Quincena } from '../lib/fechas'
-import { pdfDeQuincena, type FilaDeQuincena } from '../lib/pdf'
+import {
+  COLUMNAS_DE_QUINCENA,
+  encabezadoDeQuincena,
+  pdfDeQuincena,
+  tablasDeQuincena,
+  type FilaDeQuincena,
+} from '../lib/pdf'
 import { formatearPesos } from '../lib/pesos'
 import { supabase } from '../lib/supabase'
 
@@ -28,9 +33,9 @@ export function PdfQuincena({ onVolver, onError }: { onVolver: () => void; onErr
 
   const siguiente = quincenaVecina(quincena, 1)
   const enCurso = quincena.hasta > hoy
-  const grupos = filas ? agruparParaCobro(filas.map((f) => ({ ...f, activo: true }))) : []
+  const tablas = filas ? tablasDeQuincena(filas) : []
   const porCobrar = filas?.reduce((suma, f) => suma + Math.max(f.saldo, 0), 0) ?? 0
-  const personas = grupos.reduce((suma, g) => suma + g.personas.length, 0)
+  const personas = tablas.reduce((suma, t) => suma + t.filas.length, 0)
   // Quien tiene saldo a favor sale en el PDF, pero no "debe".
   const deben = filas?.filter((f) => f.saldo > 0).length ?? 0
 
@@ -91,20 +96,11 @@ export function PdfQuincena({ onVolver, onError }: { onVolver: () => void; onErr
             )}
           </p>
 
-          {grupos.length > 0 && (
-            <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
-              {grupos.map((g) => (
-                <li key={g.departamentoId} className="flex items-baseline gap-3 px-4 py-3">
-                  <span className="text-lg font-semibold">{g.departamento}</span>
-                  <span className="flex-1 text-base text-tinta-suave">
-                    · {g.personas.length} {g.personas.length === 1 ? 'persona' : 'personas'}
-                  </span>
-                  <span className="text-lg font-semibold tabular-nums">
-                    {formatearPesos(g.personas.reduce((suma, s) => suma + Math.max(s.saldo, 0), 0))}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {personas > 0 && (
+            <>
+              <p className="-mb-2 text-lg text-tinta-suave">Así va a salir en el PDF:</p>
+              <VistaPrevia quincena={quincena} hoy={hoy} tablas={tablas} />
+            </>
           )}
 
           <BotonPdf
@@ -114,12 +110,74 @@ export function PdfQuincena({ onVolver, onError }: { onVolver: () => void; onErr
             preparar={() => pdfDeQuincena(filas, quincena, hoy)}
             onError={onError}
           />
-          <p className="text-lg text-tinta-suave">
-            Sale una lista por departamento con lo que cada persona venía debiendo, lo que compró y pagó en la
-            quincena, y lo que debe. Se puede mandar por WhatsApp, imprimir o guardar.
-          </p>
+          <p className="text-lg text-tinta-suave">Se puede mandar por WhatsApp, imprimir o guardar.</p>
         </>
       )}
     </section>
+  )
+}
+
+/**
+ * Lo mismo que lleva el PDF, en la pantalla: los mismos títulos, tablas,
+ * encabezados y valores (salen de tablasDeQuincena, igual que el PDF).
+ */
+function VistaPrevia({
+  quincena,
+  hoy,
+  tablas,
+}: {
+  quincena: Quincena
+  hoy: string
+  tablas: ReturnType<typeof tablasDeQuincena>
+}) {
+  const arriba = encabezadoDeQuincena(quincena, hoy)
+  const celda = 'border border-control px-2 py-1.5'
+  return (
+    <div className="flex flex-col gap-6 rounded-xl border border-linea bg-superficie px-4 py-6">
+      <div className="text-center">
+        <p className="text-2xl font-bold">{arriba.titulo}</p>
+        <p className="text-lg">{arriba.quincena}</p>
+        <p className="text-base text-tinta-suave">{arriba.hecho}</p>
+      </div>
+      {tablas.map((t, n) => (
+        <div key={t.departamento} className="flex flex-col gap-2">
+          <h2 id={`departamento-${n}`} className="text-center text-lg font-bold">
+            {t.departamento}
+          </h2>
+          {/* En el celular la tabla puede no caber: se corre de lado sin mover la pantalla. */}
+          <div className="overflow-x-auto">
+            <table aria-labelledby={`departamento-${n}`} className="w-full border-collapse text-base tabular-nums">
+              <thead>
+                <tr>
+                  {COLUMNAS_DE_QUINCENA.map((c, i) => (
+                    <th
+                      key={c}
+                      scope="col"
+                      className={`${celda} font-semibold ${i === 0 ? 'text-left' : 'text-right'}`}
+                    >
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {t.filas.map((fila, i) => (
+                  <tr key={i}>
+                    {fila.map((valor, j) => (
+                      <td
+                        key={j}
+                        className={`${celda} ${j === 0 ? 'text-left' : 'text-right whitespace-nowrap'} ${j === fila.length - 1 ? 'font-bold' : ''}`}
+                      >
+                        {valor}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
