@@ -52,9 +52,22 @@ describe('agruparParaCobro al buscar', () => {
   })
 })
 
-describe('agruparParaCobro después de pagar', () => {
-  it('mantiene en la lista a quien acaba de quedar al día, para que no salte', () => {
-    const grupos = agruparParaCobro(saldos, '', new Set([4]))
-    expect(grupos[0].personas.map((p) => p.nombre)).toEqual(['Juan', 'Luis', 'Rosa'])
+describe('agruparParaCobro con quien está al día (Cobrar)', () => {
+  it('pone a quien está al día en su departamento, en orden', () => {
+    const grupos = agruparParaCobro(saldos, '', true)
+    expect(grupos.map((g) => [g.departamento, g.total, g.personas.map((p) => p.nombre)])).toEqual([
+      ['Bodega', 6000, ['Juan', 'Luis', 'Rosa']],
+      ['TDH', 35000, ['Ángela', 'Pedro']],
+    ])
+  })
+
+  it('un departamento donde todos están al día también sale', () => {
+    const grupos = agruparParaCobro([saldo(8, 'Ana', 3, 'Gerencia', 0)], '', true)
+    expect(grupos.map((g) => [g.departamento, g.total])).toEqual([['Gerencia', 0]])
+  })
+
+  it('las archivadas al día siguen sin salir', () => {
+    const grupos = agruparParaCobro([{ ...saldo(6, 'María Espinosa', 1, 'Bodega', 0), activo: false }], '', true)
+    expect(grupos).toEqual([])
   })
 })

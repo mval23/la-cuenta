@@ -4,10 +4,12 @@ import { Aviso } from '../componentes/Aviso'
 import { useAviso } from '../componentes/useAviso'
 import { usePantallaAncha } from '../componentes/usePantallaAncha'
 import { Boton } from '../componentes/Boton'
+import { Confirmar } from '../componentes/Confirmar'
 import { ErrorDeCarga } from '../componentes/ErrorDeCarga'
 import { campo, etiqueta } from '../componentes/estilos'
 import { PanelDePago } from '../componentes/Pago'
 import { agruparParaCobro, type GrupoDeCobro } from '../lib/cobro'
+import { hoyBogota, inicioDeQuincenas } from '../lib/fechas'
 import { guardarPago, type TipoDePago } from '../lib/pagos'
 import { normalizarNombre } from '../lib/personas'
 import { formatearPesos } from '../lib/pesos'
@@ -19,6 +21,12 @@ import { PdfQuincena } from './PdfQuincena'
 
 type Vista = 'lista' | 'quincena' | 'cuentaDeCobro'
 
+/** El "Pagó todo" con que alguien quedó al día: se puede quitar desde la lista. */
+interface PagoTotal {
+  id: number
+  valor: number
+}
+
 export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boolean; inicio: number }) {
   const [saldos, setSaldos] = useState<Saldo[] | null>(null)
   // Los activos, también los que no tienen a nadie debiendo: ahí se agregan personas.
@@ -27,8 +35,8 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
   const [errorDeCarga, setErrorDeCarga] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [abierta, setAbierta] = useState<number | null>(null)
-  // Quien pagó mientras la pantalla está abierta se queda en la lista.
-  const [pagadas, setPagadas] = useState<ReadonlySet<number>>(new Set())
+  // El último pago de cada persona, si fue "Pagó todo" (de esta quincena o la anterior).
+  const [pagosTotales, setPagosTotales] = useState<ReadonlyMap<number, PagoTotal>>(new Map())
   const [plegados, setPlegados] = useState<ReadonlySet<number>>(new Set())
   // Los documentos en PDF se abren en lugar de la lista.
   const [vista, setVista] = useState<Vista>('lista')
@@ -48,19 +56,35 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
   }
 
   const cargar = useCallback(async () => {
-    const [{ data, error }, d] = await Promise.all([
+    const [{ data, error }, d, p] = await Promise.all([
       supabase.from('saldos').select('persona_id, nombre, departamento_id, departamento, activo, comprado, pagado, saldo'),
       supabase.from('departamentos').select('id, nombre').eq('activo', true),
+      supabase
+        .from('pagos')
+        .select('id, persona_id, valor_pesos, tipo')
+        .eq('anulado', false)
+        .gte('fecha', inicioDeQuincenas(hoyBogota(), 2))
+        .order('creado_en', { ascending: false }),
     ])
     setErrorDeCarga(error !== null || d.error !== null)
     if (data) setSaldos(data)
     if (d.data) setDepartamentos(d.data)
+    if (p.data) {
+      // Vienen del más nuevo al más viejo: el primero de cada persona es su último pago.
+      const ultimos = new Map<number, PagoTotal | null>()
+      for (const pago of p.data) {
+        if (ultimos.has(pago.persona_id)) continue
+        ultimos.set(pago.persona_id, pago.tipo === 'total' ? { id: pago.id, valor: pago.valor_pesos } : null)
+      }
+      const totales = new Map<number, PagoTotal>()
+      for (const [persona, pago] of ultimos) if (pago) totales.set(persona, pago)
+      setPagosTotales(totales)
+    }
   }, [])
 
   // Se recarga cada vez que se entra a la pestaña: pudo haber compras nuevas.
   useEffect(() => {
     if (!activa) return
-    setPagadas(new Set())
     cargar()
   }, [activa, cargar])
 
@@ -108,9 +132,29 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
       valor,
       tipo,
       mostrar,
-      alGuardar: () => setPagadas((antes) => new Set(antes).add(s.persona_id)),
       recargar: cargar,
     })
+  }
+
+  /** Quita un "Pagó todo" equivocado: la persona vuelve a deber. */
+  async function quitarPago(s: Saldo, pago: PagoTotal) {
+    cerrar()
+    const { error } = await supabase.from('pagos').update({ anulado: true }).eq('id', pago.id)
+    if (error) {
+      mostrar({ tipo: 'error', texto: 'No se pudo quitar el pago. Revisa el internet e intenta otra vez.' })
+      return
+    }
+    mostrar({
+      tipo: 'ok',
+      texto: `Se quitó el pago de ${s.nombre}: ${formatearPesos(pago.valor)}`,
+      deshacer: async () => {
+        const { error: errorDeshacer } = await supabase.from('pagos').update({ anulado: false }).eq('id', pago.id)
+        if (errorDeshacer) mostrar({ tipo: 'error', texto: 'No se pudo deshacer. Revisa el internet.' })
+        else mostrar({ tipo: 'ok', texto: `${s.nombre} vuelve a quedar al día.` })
+        await cargar()
+      },
+    })
+    await cargar()
   }
 
   const avisoFlotante = <Aviso aviso={aviso} onCerrar={cerrar} />
@@ -163,8 +207,9 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
   }
 
   const porCobrar = saldos.reduce((suma, s) => suma + Math.max(s.saldo, 0), 0)
-  const grupos = agruparParaCobro(saldos, busqueda, pagadas)
-  // Los departamentos sin nadie en la lista van al final: ahí también se agrega gente.
+  // Todos, también quien está al día: así se ve quién ya pagó.
+  const grupos = agruparParaCobro(saldos, busqueda, true)
+  // Los departamentos sin nadie van al final: ahí también se agrega gente.
   const buscado = normalizarNombre(busqueda)
   const sinNadie: GrupoDeCobro[] = departamentos
     .filter((d) => !grupos.some((g) => g.departamentoId === d.id))
@@ -271,10 +316,8 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
                     <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <span className="text-xl font-semibold">{g.departamento}</span>
-                  <span className="flex-1 text-base text-tinta-suave">
-                    · {g.personas.length} {g.personas.length === 1 ? 'persona' : 'personas'}
-                  </span>
-                  <span className="text-lg font-semibold tabular-nums">{formatearPesos(g.total)}</span>
+                  <span className="flex-1 text-base text-tinta-suave">· {cuantasDeben(g.personas)}</span>
+                  <MontoDeSaldo valor={g.total} />
                 </button>
               </h2>
             </div>
@@ -285,8 +328,10 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
                     key={s.persona_id}
                     saldo={s}
                     seleccionada={ancha && s.persona_id === abierta}
+                    pagoTotal={s.saldo === 0 ? pagosTotales.get(s.persona_id) : undefined}
                     onAbrir={() => abrir(s.persona_id)}
                     onPago={(valor, tipo) => registrarPago(s, valor, tipo)}
+                    onQuitarPago={(pago) => quitarPago(s, pago)}
                   />
                 ))}
                 <li className="px-3 py-2">
@@ -301,7 +346,7 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
       {sinNadie.length > 0 && (
         <div className="flex flex-col gap-2">
           <h2 className="text-xl font-semibold">
-            {grupos.length > 0 ? 'Sin nada por cobrar' : 'Departamentos sin nada por cobrar'}
+            Departamentos sin personas
           </h2>
           <ul className="divide-y divide-linea overflow-hidden rounded-xl border border-linea bg-superficie">
             {sinNadie.map((g) => (
@@ -320,8 +365,7 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
       <div className="flex flex-col gap-3 border-t border-linea pt-5">
         <NuevoDepartamento mostrar={mostrar} onAgregado={cargar} />
         <p className="text-lg text-tinta-suave">
-          Para cambiar el nombre o el departamento de alguien, o archivarlo, toca su nombre. Si está al día, búscalo
-          arriba.
+          Para cambiar el nombre o el departamento de alguien, o archivarlo, toca su nombre.
         </p>
       </div>
     </section>
@@ -355,18 +399,32 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
   )
 }
 
+/** "3 deben", "1 debe" o "todos al día". */
+function cuantasDeben(personas: Saldo[]): string {
+  const deben = personas.filter((p) => p.saldo > 0).length
+  if (deben === 0) return 'todos al día'
+  return deben === 1 ? '1 debe' : `${deben} deben`
+}
+
 function FilaDeCobro({
   saldo: s,
   seleccionada,
+  pagoTotal,
   onAbrir,
   onPago,
+  onQuitarPago,
 }: {
   saldo: Saldo
   seleccionada: boolean
+  /** Si quedó al día con un "Pagó todo": se puede quitar con la X. */
+  pagoTotal?: PagoTotal
   onAbrir: () => void
   onPago: (valor: number, tipo: TipoDePago) => Promise<boolean>
+  onQuitarPago: (pago: PagoTotal) => Promise<void>
 }) {
   const [modo, setModo] = useState<TipoDePago | null>(null)
+  const [quitando, setQuitando] = useState(false)
+  const [ocupado, setOcupado] = useState(false)
 
   return (
     <li>
@@ -395,9 +453,38 @@ function FilaDeCobro({
             </Boton>
           </>
         )}
+        {pagoTotal && !quitando && (
+          <button
+            type="button"
+            onClick={() => setQuitando(true)}
+            aria-label={`Quitar el pago de ${s.nombre}`}
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-exito-suave pr-3 pl-4 text-lg font-semibold text-exito active:bg-hundido"
+          >
+            Pagó todo
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-none stroke-current stroke-[2.5]">
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {modo !== null && <PanelDePago saldo={s} tipo={modo} onPago={onPago} onCerrar={() => setModo(null)} />}
+      {pagoTotal && quitando && (
+        <Confirmar
+          pregunta={`¿Quitar el pago de ${formatearPesos(pagoTotal.valor)}?`}
+          detalle={`${s.nombre} vuelve a deber ${formatearPesos(pagoTotal.valor)}.`}
+          textoSi="Sí, quitar"
+          ocupado={ocupado}
+          textoOcupado="Quitando..."
+          onNo={() => setQuitando(false)}
+          onSi={async () => {
+            setOcupado(true)
+            await onQuitarPago(pagoTotal)
+            setOcupado(false)
+            setQuitando(false)
+          }}
+        />
+      )}
     </li>
   )
 }
