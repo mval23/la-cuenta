@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  distancia,
   nombreDictado,
   normalizarNombre,
   parecidas,
@@ -99,6 +100,13 @@ describe('nombres que suenan igual o parecido', () => {
     expect(suenanParecido('Jaison Fondo', 'Jason Fondo')).toBe(true)
     expect(suenanParecido('Jaison', 'Jason')).toBe(true)
     expect(suenanParecido('Estiven', 'Steven')).toBe(true)
+  })
+
+  it('dos letras cambiadas de lugar cuentan como una: "Baryan" es Brayan', () => {
+    expect(distancia('barian', 'braian')).toBe(1)
+    expect(suenanParecido('Baryan', 'Brayan')).toBe(true)
+    expect(suenanParecido('Bryan', 'Brayan')).toBe(true)
+    expect(parecidas('Baryan', [{ id: 3, nombre: 'Brayan', departamento_id: 1, activo: true }]).map((p) => p.id)).toEqual([3])
   })
 
   it('nombres distintos no se confunden', () => {

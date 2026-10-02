@@ -165,17 +165,23 @@ export function suenanIgual(a: string, b: string): boolean {
   return sa !== '' && sa === sonido(b)
 }
 
-/** Distancia de edición entre dos textos. */
+/**
+ * Distancia de edición entre dos textos. Dos letras vecinas cambiadas de lugar
+ * cuentan como una sola diferencia: el dictado escribió "Baryan" por Brayan.
+ */
 export function distancia(a: string, b: string): number {
-  let previa = Array.from({ length: b.length + 1 }, (_, j) => j)
+  const d = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  )
   for (let i = 1; i <= a.length; i++) {
-    const actual = [i]
     for (let j = 1; j <= b.length; j++) {
-      actual[j] = Math.min(previa[j] + 1, actual[j - 1] + 1, previa[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+      }
     }
-    previa = actual
   }
-  return previa[b.length]
+  return d[a.length][b.length]
 }
 
 /** Suenan igual o casi: "Reibi" y "Raybin". En nombres cortos, solo si suenan igual. */
