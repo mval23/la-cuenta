@@ -10,8 +10,8 @@ cuenta en Cobrar, en los PDF y en lo que reconoce el dictado.
 
 - **No inventar nada.** Ni compras, ni pagos, ni personas, ni departamentos "de
   prueba". Solo se observa lo que pasa de verdad.
-- Si algo se anota mal durante la observación, se corrige como siempre: Anular,
-  Deshacer o corregir desde el historial de la persona. Nada se borra.
+- Si algo se anota mal durante la observación, se corrige como siempre: Anular o
+  corregir desde el historial de la persona. Nada se borra.
 - No ayudarle mientras hace algo. Si se queda quieta más de 30 segundos, preguntarle
   "¿Qué estás buscando?", sin decirle dónde está.
 - Lo que haya que pedirle ("¿cuánto debe…?", "gira el iPad") es solo para mirar, no
@@ -36,7 +36,7 @@ no se provocan.
 | 3 | Anota una compra sin hablar (hay ruido, la voz falla o lo prefiere). | Toca Anotar a mano, busca a la persona, pone el valor y guarda. | ¿Encuentra Anotar a mano? Si hay dos con el mismo nombre, ¿elige bien? |
 | 4 | Aparece "¿Seguro que son $…?" (un valor muy bajo o muy alto). | Lee la pregunta y decide. | ¿La entiende o la salta sin leer? |
 | 5 | La interrumpen mientras anota (alguien viene a pagar). | Al volver a Registrar, la compra a medio anotar sigue ahí. | ¿Encuentra la tarjeta al volver? ¿Cree que ya se había guardado? |
-| 6 | Se equivoca en algo que anotó. | Toca Anular y confirma, o usa Deshacer en el aviso. | ¿Encuentra Anular? ¿Alcanza a ver el aviso de abajo? |
+| 6 | Se equivoca en algo que anotó. | Toca Anular y confirma. | ¿Encuentra Anular? |
 | 7 | Alguien paga todo o abona. | En Cobrar lo encuentra y toca Pagó todo o Abono. | ¿Usa el buscador o baja por la lista? ¿Entiende la diferencia entre Pagó todo y Abono? |
 | 8 | Alguien pregunta cuánto debe (o pedirle: "¿cuánto debe fulano y qué compró?"). | Abre su detalle y lo explica con el historial por quincena. | ¿Explica el saldo con lo que ve, sin sumar de memoria? ¿Sabe volver? |
 | 9 | Llega alguien nuevo a comprar. | Lo crea al anotar la compra o con Agregar persona en Cobrar. | ¿Toca Cerrar sin agregar? ¿Le salen personas parecidas y las entiende? |
@@ -56,7 +56,6 @@ no se provocan.
 - La letra sigue un poco el tamaño de texto del iPad (Pantalla y brillo > Tamaño del texto), hasta 19px: ¿se lee bien con el que ella usa? ¿Cabe todo? Si cabe y le sirve, probar subir el tope a 20 en src/lib/letra.ts.
 - Con el teclado abierto en horizontal, el botón Guardar se ve al escribir el valor.
 - La barra de pestañas no choca con la barra de inicio del iPad.
-- El aviso con Deshacer dura unos 20 segundos: ¿le alcanza? ¿Le estorba?
 - Con Ajustes > Accesibilidad > Movimiento > Reducir movimiento, no hay animaciones que parpadeen.
 
 ## Cuándo va bien
