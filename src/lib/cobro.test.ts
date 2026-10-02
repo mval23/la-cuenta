@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agruparParaCobro } from './cobro'
+import { agruparParaCobro, cuentaDeQuincena } from './cobro'
 import type { Saldo } from './tipos'
 
 function saldo(persona_id: number, nombre: string, departamento_id: number, departamento: string, valor: number): Saldo {
@@ -69,5 +69,45 @@ describe('agruparParaCobro con quien está al día (Cobrar)', () => {
   it('las archivadas al día siguen sin salir', () => {
     const grupos = agruparParaCobro([{ ...saldo(6, 'María Espinosa', 1, 'Bodega', 0), activo: false }], '', true)
     expect(grupos).toEqual([])
+  })
+})
+
+describe('cuentaDeQuincena', () => {
+  const m = (tabla: 'compras' | 'pagos', fecha: string, valor: number, extra: { anulado?: boolean; especial?: boolean } = {}) => ({
+    tabla,
+    fecha,
+    valor,
+    anulado: extra.anulado ?? false,
+    especial: extra.especial ?? false,
+  })
+
+  it('venía debiendo + normales + especiales - pagó = lo que debe', () => {
+    const movimientos = [
+      m('compras', '2026-09-30', 15000, { especial: true }),
+      m('pagos', '2026-09-29', 4400),
+      m('compras', '2026-09-28', 4400),
+      m('compras', '2026-09-25', 4400),
+      m('compras', '2026-09-18', 7000),
+      // Lo anulado no cuenta, y lo de antes de la quincena va en "venía debiendo".
+      m('compras', '2026-09-20', 9999, { anulado: true }),
+      m('compras', '2026-09-10', 8000),
+    ]
+    expect(cuentaDeQuincena(movimientos, 34400, '2026-09-16', '2026-09-30')).toEqual({
+      venia: 8000,
+      normales: 15800,
+      especiales: 15000,
+      pago: 4400,
+      total: 34400,
+    })
+  })
+
+  it('sin nada en la quincena, venía debiendo es lo que debe', () => {
+    expect(cuentaDeQuincena([], -2000, '2026-10-01', '2026-10-15')).toEqual({
+      venia: -2000,
+      normales: 0,
+      especiales: 0,
+      pago: 0,
+      total: -2000,
+    })
   })
 })

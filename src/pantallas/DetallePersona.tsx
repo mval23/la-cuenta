@@ -9,6 +9,7 @@ import { DatosDePersona } from '../componentes/DatosDePersona'
 import { BotonEspecial, EtiquetaEspecial, FranjaEspecial } from '../componentes/Especial'
 import { campo, etiqueta } from '../componentes/estilos'
 import { PanelDePago } from '../componentes/Pago'
+import { cuentaDeQuincena, type CuentaDeQuincena } from '../lib/cobro'
 import { fechaLarga, hoyBogota, inicioDeQuincenas, nombreDeQuincena, quincenaDe, type Quincena } from '../lib/fechas'
 import type { TipoDePago } from '../lib/pagos'
 import { formatearPesos, valorInusual } from '../lib/pesos'
@@ -401,6 +402,7 @@ export function DetallePersona({
   // Lo que venía debiendo de antes de lo que se ve: así el saldo de arriba cuadra con la lista.
   const anterior = cargados && s.saldo - (suma(cargados.lista, 'compras') - suma(cargados.lista, 'pagos'))
   const Subtitulo = enPanel ? 'h3' : 'h2'
+  const estaQuincena = quincenaDe(hoyBogota())
 
   // Una archivada ya no compra.
   const puedeAgregar = s.activo
@@ -494,6 +496,11 @@ export function DetallePersona({
 
       {cargados && (
         <div className="flex flex-col gap-4">
+          <CuentaDeEstaQuincena
+            cuenta={cuentaDeQuincena(cargados.lista, s.saldo, estaQuincena.desde, estaQuincena.hasta)}
+            quincena={estaQuincena}
+            Subtitulo={Subtitulo}
+          />
           {grupos.length === 0 ? (
             <p className="text-lg text-tinta-suave">No hay compras ni pagos desde el {fechaLarga(cargados.desde)}.</p>
           ) : (
@@ -503,8 +510,9 @@ export function DetallePersona({
             const compro = suma(g.lista, 'compras')
             const especiales = sumaEspeciales(g.lista)
             const pago = suma(g.lista, 'pagos')
-            // Con especiales, lo normal y lo especial van aparte.
-            const partes = [
+            // Con especiales, lo normal y lo especial van aparte. Lo de esta
+            // quincena ya está en su cuenta, arriba.
+            const partes = g.quincena.desde === estaQuincena.desde ? [] : [
               especiales > 0
                 ? compro > especiales && <span key="n">Normal {formatearPesos(compro - especiales)}</span>
                 : compro > 0 && <span key="c">Compró {formatearPesos(compro)}</span>,
@@ -556,6 +564,53 @@ export function DetallePersona({
 
       <DatosDePersona saldo={s} enPanel={enPanel} mostrar={mostrar} onCambio={onCambio} onUnida={onUnida} />
     </section>
+  )
+}
+
+/**
+ * La cuenta de esta quincena, como en el cuaderno: lo que venía debiendo,
+ * más lo que compró, menos lo que pagó, y abajo el total que debe.
+ */
+function CuentaDeEstaQuincena({
+  cuenta: c,
+  quincena,
+  Subtitulo,
+}: {
+  cuenta: CuentaDeQuincena
+  quincena: Quincena
+  Subtitulo: 'h2' | 'h3'
+}) {
+  const fila = 'flex items-baseline justify-between gap-4 py-1.5 text-xl'
+  return (
+    <div className="rounded-xl border border-linea bg-superficie px-5 py-4">
+      <Subtitulo className="mb-1 text-lg font-semibold">Esta quincena, del {nombreDeQuincena(quincena)}</Subtitulo>
+      <dl className="tabular-nums">
+        <div className={fila}>
+          <dt className="text-tinta-suave">Venía debiendo</dt>
+          <dd className={`font-bold ${c.venia < 0 ? 'text-exito' : ''}`}>
+            {c.venia < 0 ? `A favor ${formatearPesos(-c.venia)}` : formatearPesos(c.venia)}
+          </dd>
+        </div>
+        <div className={fila}>
+          <dt className="text-tinta-suave">Compras normales</dt>
+          <dd className="font-bold">{formatearPesos(c.normales)}</dd>
+        </div>
+        <div className={fila}>
+          <dt className="font-semibold text-especial">Almuerzos especiales</dt>
+          <dd className="font-bold text-especial">{formatearPesos(c.especiales)}</dd>
+        </div>
+        <div className={fila}>
+          <dt className="font-semibold text-exito">Pagó</dt>
+          <dd className="font-bold text-exito">{c.pago > 0 ? `−${formatearPesos(c.pago)}` : formatearPesos(0)}</dd>
+        </div>
+        <div className="mt-2 flex items-baseline justify-between gap-4 border-t-2 border-tinta pt-2.5 text-2xl font-bold">
+          <dt>{c.total < 0 ? 'Tiene a favor' : 'Total que debe'}</dt>
+          <dd className={c.total <= 0 ? 'text-exito' : ''}>
+            {c.total === 0 ? 'Al día' : formatearPesos(Math.abs(c.total))}
+          </dd>
+        </div>
+      </dl>
+    </div>
   )
 }
 

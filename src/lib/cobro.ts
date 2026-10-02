@@ -47,3 +47,42 @@ export function agruparParaCobro(saldos: Saldo[], busqueda = '', conAlDia = fals
   lista.forEach((g) => g.personas.sort((a, b) => orden(a.nombre, b.nombre)))
   return lista
 }
+
+/** Una compra o un pago, con lo justo para sumar la cuenta de la quincena. */
+export interface MovimientoDeCuenta {
+  tabla: 'compras' | 'pagos'
+  fecha: string
+  valor: number
+  anulado: boolean
+  especial: boolean
+}
+
+export interface CuentaDeQuincena {
+  /** Lo que debía antes de empezar la quincena (negativo: tenía a favor). */
+  venia: number
+  normales: number
+  especiales: number
+  pago: number
+  /** venia + normales + especiales - pago: lo que debe hoy. */
+  total: number
+}
+
+/**
+ * La cuenta de una persona en la quincena, como en el cuaderno: lo que venía
+ * debiendo, más lo que compró, menos lo que pagó. `saldo` es lo que debe hoy;
+ * lo que venía debiendo sale de restarle lo de la quincena.
+ */
+export function cuentaDeQuincena(
+  movimientos: MovimientoDeCuenta[],
+  saldo: number,
+  desde: string,
+  hasta: string,
+): CuentaDeQuincena {
+  const vigentes = movimientos.filter((m) => !m.anulado && m.fecha >= desde && m.fecha <= hasta)
+  const sumar = (lista: MovimientoDeCuenta[]) => lista.reduce((total, m) => total + m.valor, 0)
+  const compras = vigentes.filter((m) => m.tabla === 'compras')
+  const normales = sumar(compras.filter((m) => !m.especial))
+  const especiales = sumar(compras.filter((m) => m.especial))
+  const pago = sumar(vigentes.filter((m) => m.tabla === 'pagos'))
+  return { venia: saldo - (normales + especiales - pago), normales, especiales, pago, total: saldo }
+}
