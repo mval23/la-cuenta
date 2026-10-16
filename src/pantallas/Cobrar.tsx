@@ -324,8 +324,11 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
                   >
                     <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <span className="text-xl font-semibold">{g.departamento}</span>
-                  <span className="flex-1 text-base text-tinta-suave">· {cuantasDeben(g.personas)}</span>
+                  {/* Si no cabe todo en una línea (celular), "· 3 deben" baja y el total no se mueve. */}
+                  <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                    <span className="text-xl font-semibold">{g.departamento}</span>
+                    <span className="text-base whitespace-nowrap text-tinta-suave">· {cuantasDeben(g.personas)}</span>
+                  </span>
                   <MontoDeSaldo valor={g.total} />
                 </button>
               </h2>
@@ -446,7 +449,7 @@ function FilaDeCobro({
             seleccionada ? 'bg-marca-suave font-semibold text-marca-oscura' : ''
           }`}
         >
-          <span className="min-w-0 flex-1 text-lg">{s.nombre}</span>
+          <span className="min-w-0 flex-1 text-lg wrap-break-word">{s.nombre}</span>
           <MontoDeSaldo valor={s.saldo} />
           <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-tinta-tenue stroke-2">
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -500,12 +503,15 @@ function FilaDeCobro({
   )
 }
 
+/** El valor nunca se parte en dos líneas: si falta espacio, se encoge el nombre. */
 function MontoDeSaldo({ valor }: { valor: number }) {
-  if (valor === 0) return <span className="text-lg font-semibold text-exito">Al día</span>
+  if (valor === 0) return <span className="shrink-0 text-lg font-semibold whitespace-nowrap text-exito">Al día</span>
   if (valor < 0) {
     return (
-      <span className="text-lg font-semibold text-exito tabular-nums">A favor {formatearPesos(-valor)}</span>
+      <span className="shrink-0 text-lg font-semibold whitespace-nowrap text-exito tabular-nums">
+        A favor {formatearPesos(-valor)}
+      </span>
     )
   }
-  return <span className="text-lg font-semibold tabular-nums">{formatearPesos(valor)}</span>
+  return <span className="shrink-0 text-lg font-semibold whitespace-nowrap tabular-nums">{formatearPesos(valor)}</span>
 }

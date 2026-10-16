@@ -901,19 +901,23 @@ function ComprasDelDia({
           <li key={c.id}>
             <div className="flex items-center gap-3 pr-3">
               <Renglon onClick={onAbrir && (() => onAbrir(c.persona_id))}>
-                <div className={`min-w-0 flex-1 ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
+                {/* En el celular el departamento va abajo, con la hora: al lado del nombre no cabe. */}
+                <div className={`min-w-0 flex-1 wrap-break-word ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}>
                   <p className="text-lg">
-                    <span className="font-semibold">{c.personas?.nombre}</span>{' '}
-                    <span className={c.anulada ? '' : 'text-tinta-suave'}>· {c.departamentos?.nombre}</span>
+                    <span className="font-semibold">{c.personas?.nombre}</span>
+                    <span className={`max-sm:hidden ${c.anulada ? '' : 'text-tinta-suave'}`}> · {c.departamentos?.nombre}</span>
                   </p>
                   <p className={`text-base ${c.anulada ? '' : 'text-tinta-suave'}`}>
+                    <span className="sm:hidden">{c.departamentos?.nombre} · </span>
                     {c.especial && !c.anulada && <EtiquetaEspecial />}
                     {c.descripcion && `${c.descripcion} · `}
-                    {dia === hoy ? hora(c.creada_en) : `anotada a las ${hora(c.creada_en)}`}
+                    <span className="whitespace-nowrap">
+                      {dia === hoy ? hora(c.creada_en) : `anotada a las ${hora(c.creada_en)}`}
+                    </span>
                   </p>
                 </div>
                 <span
-                  className={`text-lg font-semibold tabular-nums ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}
+                  className={`text-lg font-semibold whitespace-nowrap tabular-nums ${c.anulada ? 'text-tinta-tenue line-through' : ''}`}
                 >
                   {formatearPesos(c.valor_pesos)}
                 </span>

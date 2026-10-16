@@ -71,14 +71,14 @@ function ResumenDeVentas({ ventas }: { ventas: DatosVentas }) {
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-linea bg-superficie px-5 py-4">
         <p className="text-lg text-tinta-suave">Hoy, {fechaLarga(ventas.hoy.fecha)}</p>
-        <p className="text-5xl font-bold tabular-nums">{formatearPesos(ventas.hoy.total)}</p>
+        <p className="text-4xl font-bold tabular-nums sm:text-5xl">{formatearPesos(ventas.hoy.total)}</p>
         <p className="text-lg text-tinta-suave">{cuantasCompras(ventas.hoy.compras)}</p>
         <NormalYEspeciales vendido={ventas.hoy} />
       </div>
 
       <div className="rounded-xl border border-linea bg-superficie px-5 py-4">
         <p className="text-lg text-tinta-suave">Esta quincena, del {nombreDeQuincena(ventas.quincena)}</p>
-        <p className="text-5xl font-bold tabular-nums">{formatearPesos(ventas.totalQuincena.total)}</p>
+        <p className="text-4xl font-bold tabular-nums sm:text-5xl">{formatearPesos(ventas.totalQuincena.total)}</p>
         <p className="text-lg text-tinta-suave">
           {ventas.dias.length === 1 ? '1 día con ventas' : `${ventas.dias.length} días con ventas`}
         </p>

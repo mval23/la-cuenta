@@ -135,11 +135,13 @@ export function Personas({ mostrar, onVolver }: { mostrar: (aviso: DatosAviso) =
           onClick={() => abrir(p.id)}
           className="flex min-h-14 w-full items-center gap-3 py-1.5 pr-3 pl-4 text-left active:bg-hundido"
         >
-          <span className={`min-w-0 flex-1 text-lg ${p.activo ? '' : 'text-tinta-suave'}`}>
+          <span className={`min-w-0 flex-1 text-lg wrap-break-word ${p.activo ? '' : 'text-tinta-suave'}`}>
             {p.nombre}
             {conDepartamento && <span className="text-base text-tinta-suave"> · {nombreDepto(p.departamento_id)}</span>}
           </span>
-          {debe > 0 && <span className="text-lg tabular-nums text-tinta-suave">Debe {formatearPesos(debe)}</span>}
+          {debe > 0 && (
+            <span className="shrink-0 text-lg whitespace-nowrap tabular-nums text-tinta-suave">Debe {formatearPesos(debe)}</span>
+          )}
           <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 fill-none stroke-tinta-tenue stroke-2">
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
