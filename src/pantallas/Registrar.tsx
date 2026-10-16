@@ -619,12 +619,19 @@ function Confirmacion({
       ) : (
         <div className="flex flex-wrap items-center gap-3 border-b border-linea pb-4">
           <p className="mr-auto text-lg text-aviso">{!listo && `Falta: ${faltan.join(', ')}.`}</p>
-          <Boton variante="secundario" onClick={onCancelar}>
-            Cancelar
-          </Boton>
-          <Boton type="submit" className="min-w-44 tabular-nums" disabled={!listo || guardando}>
-            {guardando ? 'Guardando...' : valor > 0 ? `Guardar ${formatearPesos(valor)}` : 'Guardar'}
-          </Boton>
+          {/* Juntos en la misma línea también en el celular. */}
+          <div className="flex gap-3 max-sm:w-full">
+            <Boton variante="secundario" onClick={onCancelar}>
+              Cancelar
+            </Boton>
+            <Boton
+              type="submit"
+              className="min-w-44 tabular-nums max-sm:min-w-0 max-sm:flex-1"
+              disabled={!listo || guardando}
+            >
+              {guardando ? 'Guardando...' : valor > 0 ? `Guardar ${formatearPesos(valor)}` : 'Guardar'}
+            </Boton>
+          </div>
         </div>
       )}
 
@@ -918,7 +925,7 @@ function ComprasDelDia({
                   <Boton
                     variante="secundario"
                     compacto
-                    className="w-24"
+                    className="w-24 max-sm:w-auto max-sm:px-3"
                     aria-label={`Anular: ${c.personas?.nombre ?? ''}, ${formatearPesos(c.valor_pesos)}`}
                     disabled={confirmando === c.id}
                     onClick={() => setConfirmando(c.id)}

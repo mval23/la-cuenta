@@ -133,33 +133,36 @@ export function Departamentos({ mostrar }: { mostrar: (aviso: DatosAviso) => voi
               />
             ) : (
               <li key={d.id}>
-                <div className="flex flex-wrap items-center gap-3 py-2 pr-3 pl-4">
-                  <div className="min-w-0 flex-1">
+                {/* Si el nombre no cabe al lado de los botones (en el celular), los botones bajan. */}
+                <div className="flex flex-wrap items-center justify-end gap-3 py-2 pr-3 pl-4">
+                  <div className="min-w-40 flex-1">
                     <p className="text-lg font-semibold">{d.nombre}</p>
                     {d.alias.length > 0 && (
                       <p className="text-base text-tinta-suave">También: {d.alias.join(', ')}</p>
                     )}
                   </div>
-                  <Boton
-                    variante="secundario"
-                    compacto
-                    aria-label={`Cambiar: ${d.nombre}`}
-                    onClick={() => {
-                      setPorArchivar(null)
-                      setEditando(d.id)
-                    }}
-                  >
-                    Cambiar
-                  </Boton>
-                  <Boton
-                    variante="secundario"
-                    compacto
-                    aria-label={`Archivar: ${d.nombre}`}
-                    disabled={porArchivar === d.id}
-                    onClick={() => setPorArchivar(d.id)}
-                  >
-                    Archivar
-                  </Boton>
+                  <div className="flex gap-3">
+                    <Boton
+                      variante="secundario"
+                      compacto
+                      aria-label={`Cambiar: ${d.nombre}`}
+                      onClick={() => {
+                        setPorArchivar(null)
+                        setEditando(d.id)
+                      }}
+                    >
+                      Cambiar
+                    </Boton>
+                    <Boton
+                      variante="secundario"
+                      compacto
+                      aria-label={`Archivar: ${d.nombre}`}
+                      disabled={porArchivar === d.id}
+                      onClick={() => setPorArchivar(d.id)}
+                    >
+                      Archivar
+                    </Boton>
+                  </div>
                 </div>
                 {porArchivar === d.id && (
                   <Confirmar

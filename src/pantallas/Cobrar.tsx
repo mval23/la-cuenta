@@ -236,7 +236,16 @@ export function Cobrar({ perfil, activa, inicio }: { perfil: Perfil; activa: boo
       <span aria-hidden="true" className="text-2xl leading-none">
         +
       </span>
-      <span>{conDepartamento ? `Agregar persona a ${g.departamento}` : 'Persona'}</span>
+      {/* En el celular sin el departamento, que ya está en el título: así cabe en una línea. */}
+      <span>
+        {conDepartamento ? (
+          <>
+            Agregar persona<span className="max-sm:hidden"> a {g.departamento}</span>
+          </>
+        ) : (
+          'Persona'
+        )}
+      </span>
     </Boton>
   )
 
@@ -443,22 +452,24 @@ function FilaDeCobro({
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
+        {/* En el celular no caben al lado del nombre: ahí se cobra (o se quita el
+            pago) desde el detalle, tocando el nombre. */}
         {modo === null && s.saldo > 0 && (
-          <>
+          <div className="hidden shrink-0 gap-3 sm:flex">
             <Boton variante="tintado" compacto aria-label={`Pagó todo: ${s.nombre}`} onClick={() => setModo('total')}>
               Pagó todo
             </Boton>
             <Boton variante="secundario" compacto aria-label={`Abono: ${s.nombre}`} onClick={() => setModo('abono')}>
               Abono
             </Boton>
-          </>
+          </div>
         )}
         {pagoTotal && !quitando && (
           <button
             type="button"
             onClick={() => setQuitando(true)}
             aria-label={`Quitar el pago de ${s.nombre}`}
-            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-exito-suave pr-3 pl-4 text-lg font-semibold text-exito active:bg-hundido"
+            className="hidden min-h-11 shrink-0 items-center gap-2 rounded-xl bg-exito-suave pr-3 pl-4 text-lg font-semibold text-exito active:bg-hundido sm:flex"
           >
             Pagó todo
             <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-none stroke-current stroke-[2.5]">

@@ -166,7 +166,7 @@ function VistaPrevia({
                     {fila.map((valor, j) => (
                       <td
                         key={j}
-                        className={`${celda} ${j === 0 ? 'text-left' : 'text-right whitespace-nowrap'} ${j === fila.length - 1 ? 'font-bold' : ''}`}
+                        className={`${celda} ${j === 0 ? 'text-left' : 'text-right'} whitespace-nowrap ${j === fila.length - 1 ? 'font-bold' : ''}`}
                       >
                         {valor}
                       </td>

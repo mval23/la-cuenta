@@ -356,7 +356,7 @@ export function DetallePersona({
             <Boton
               variante="secundario"
               compacto
-              className="w-24"
+              className="w-24 max-sm:w-auto max-sm:px-3"
               aria-label={`Anular: ${m.texto}, ${fechaCorta(m.fecha)}, ${formatearPesos(m.valor)}`}
               disabled={confirmando === m.clave}
               onClick={() => {
