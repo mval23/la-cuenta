@@ -51,7 +51,7 @@ function instrucciones(hoy: string): string {
   return `Eres el asistente de Amparo, que maneja la cocina de una empresa en Neiva, Colombia. Ella te explica de palabra una cuenta de cobro para una empresa: qué se sirvió, cuándo, cuántas unidades y cuánto vale. El texto viene de un dictado por voz y puede tener errores de reconocimiento.
 
 Convierte lo que dice en filas de la cuenta de cobro. Reglas:
-- Hoy es ${hoy}. Las fechas van como AAAA-MM-DD. Si no dice el año, usa la fecha más reciente que no sea posterior a hoy. Si una fila no dice fecha, usa la de la fila anterior; si ninguna la dice, usa hoy.
+- Hoy es ${hoy}. Las fechas van como AAAA-MM-DD. Si no dice el año, usa el de la fecha más cercana a hoy, antes o después: la cuenta puede tener días que todavía no han llegado. Si una fila no dice fecha, usa la de la fila anterior; si ninguna la dice, usa hoy.
 - Los valores son pesos colombianos enteros. Los precios de la cocina casi siempre son miles: "62" o "62 mil" es 62000; "1 millón 200" es 1200000.
 - valor_total es lo que suma la fila. Si dice cantidad y precio de cada uno ("9 desayunos a 16 mil"), unidades = 9, valor_unitario = 16000 y valor_total = 144000. Si solo dice el total, valor_unitario es null. Si no dice cantidad, unidades es null.
 - Si una fila no tiene valor, pon valor_total = 0. No inventes valores ni filas.
@@ -113,11 +113,22 @@ function esFecha(valor: string | null): valor is string {
   return !!valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) && !Number.isNaN(Date.parse(valor))
 }
 
+// Una fila puede ser de días que todavía no han llegado, pero no de más de un
+// año después (lo mismo que deja elegir el calendario de la cuenta).
+const DIAS_ADELANTE = 366
+
+function sumarDias(dia: string, dias: number): string {
+  const fecha = new Date(`${dia}T12:00:00Z`)
+  fecha.setUTCDate(fecha.getUTCDate() + dias)
+  return fecha.toISOString().slice(0, 10)
+}
+
 /** Revisa lo que devolvió el modelo: no se confía en que cumpla el esquema. */
 export function limpiarCuenta(crudo: unknown, hoy: string): CuentaDictada {
   const o = (crudo && typeof crudo === 'object' ? crudo : {}) as Record<string, unknown>
   const filas: FilaDictada[] = []
   let fechaAnterior = hoy
+  const maximo = sumarDias(hoy, DIAS_ADELANTE)
   for (const f of Array.isArray(o.filas) ? o.filas.slice(0, FILAS_MAXIMAS) : []) {
     if (!f || typeof f !== 'object') continue
     const fila = f as Record<string, unknown>
@@ -128,7 +139,7 @@ export function limpiarCuenta(crudo: unknown, hoy: string): CuentaDictada {
     if (!valorTotal && unidades && valorUnitario) valorTotal = unidades * valorUnitario
     if (!descripcion && !valorTotal) continue
     const fecha = texto(fila.fecha)
-    if (esFecha(fecha) && fecha <= hoy) fechaAnterior = fecha
+    if (esFecha(fecha) && fecha <= maximo) fechaAnterior = fecha
     filas.push({
       fecha: fechaAnterior,
       unidades,

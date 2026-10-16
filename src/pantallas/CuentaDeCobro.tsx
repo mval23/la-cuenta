@@ -17,6 +17,8 @@ import { ErrorDeVoz, TIEMPOS_LARGOS } from '../lib/voz'
 
 // Las filas pueden ser de meses atrás: una cuenta a veces junta varias quincenas.
 const DIAS_ATRAS_EN_CUENTA = 366
+// Y también de días que todavía no han llegado.
+const DIAS_ADELANTE_EN_CUENTA = 366
 // El borrador sobrevive si el iPad cierra la app mientras se arma la cuenta.
 const BORRADOR = 'la-cuenta:borrador-cuenta-de-cobro'
 
@@ -285,7 +287,7 @@ export function CuentaDeCobro({ onVolver, mostrar }: { onVolver: () => void; mos
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <span className={etiqueta}>Fecha de la cuenta</span>
-            <ElegirDia dia={fecha} hoy={hoy} onCambiar={setFecha} etiqueta="Fecha de la cuenta" diasAtras={DIAS_ATRAS_EN_CUENTA} />
+            <ElegirDia dia={fecha} hoy={hoy} onCambiar={setFecha} etiqueta="Fecha de la cuenta" diasAtras={DIAS_ATRAS_EN_CUENTA} diasAdelante={DIAS_ADELANTE_EN_CUENTA} />
           </div>
           <label className="flex flex-col gap-1">
             <span className={etiqueta}>Por concepto de</span>
@@ -420,7 +422,7 @@ function FilaEditable({
       <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-3 sm:grid-cols-[minmax(0,1fr)_6rem_8.5rem_9rem]">
         <div className="col-span-1 flex flex-col gap-1">
           <span className={etiqueta}>Fecha</span>
-          <ElegirDia dia={f.fecha} hoy={hoy} onCambiar={(fecha) => onCambiar({ fecha })} etiqueta={`Fecha de la fila ${numero}`} diasAtras={DIAS_ATRAS_EN_CUENTA} />
+          <ElegirDia dia={f.fecha} hoy={hoy} onCambiar={(fecha) => onCambiar({ fecha })} etiqueta={`Fecha de la fila ${numero}`} diasAtras={DIAS_ATRAS_EN_CUENTA} diasAdelante={DIAS_ADELANTE_EN_CUENTA} />
         </div>
         <label className="flex flex-col gap-1">
           <span className={etiqueta}>Cantidad</span>

@@ -115,19 +115,24 @@ describe('limpiarCuenta', () => {
     expect(filas[0].valorTotal).toBe(144000)
   })
 
-  it('una fecha que falta, está mal escrita o es del futuro toma la de la fila anterior', () => {
+  it('una fecha que falta, está mal escrita o es de más de un año después toma la de la fila anterior', () => {
     const { filas } = limpiarCuenta(
       {
         filas: [
           fila({ fecha: '2026-08-26' }),
           fila({ fecha: '' }),
           fila({ fecha: 'ayer' }),
-          fila({ fecha: '2026-12-01' }),
+          fila({ fecha: '2028-01-01' }),
         ],
       },
       HOY,
     )
     expect(filas.map((f) => f.fecha)).toEqual(['2026-08-26', '2026-08-26', '2026-08-26', '2026-08-26'])
+  })
+
+  it('acepta fechas de días que todavía no han llegado', () => {
+    const { filas } = limpiarCuenta({ filas: [fila({ fecha: '2026-12-01' }), fila({ fecha: null })] }, HOY)
+    expect(filas.map((f) => f.fecha)).toEqual(['2026-12-01', '2026-12-01'])
   })
 
   it('sin ninguna fecha, usa hoy', () => {

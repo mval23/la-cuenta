@@ -64,10 +64,11 @@ export function nombreDelDia(dia: string, hoy = hoyBogota()): string {
   return fechaLarga(dia)
 }
 
-/** "Hoy, viernes 18 de septiembre" o "martes 15 de septiembre". */
+/** "Hoy, viernes 18 de septiembre" o "martes 15 de septiembre" (también un día que no ha llegado). */
 export function nombreCompletoDelDia(dia: string, hoy = hoyBogota()): string {
   const nombre = nombreDelDia(dia, hoy)
-  return diasEntre(dia, hoy) <= 2 ? `${nombre}, ${fechaLarga(dia)}` : nombre
+  const atras = diasEntre(dia, hoy)
+  return atras >= 0 && atras <= 2 ? `${nombre}, ${fechaLarga(dia)}` : nombre
 }
 
 // Calendario ------------------------------------------------------------------

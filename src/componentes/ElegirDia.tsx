@@ -19,9 +19,10 @@ function mayuscula(texto: string): string {
 
 /**
  * Botón con el día elegido que abre un calendario propio, con letra grande: el
- * selector del iPad sale con letra muy pequeña. Solo deja elegir entre hoy y
- * `diasAtras` días atrás; por defecto DIAS_ATRAS_PERMITIDOS, lo mismo que la
- * base acepta para una compra.
+ * selector del iPad sale con letra muy pequeña. Solo deja elegir entre
+ * `diasAtras` días atrás (por defecto DIAS_ATRAS_PERMITIDOS, lo mismo que la
+ * base acepta para una compra) y `diasAdelante` días después de hoy (por
+ * defecto ninguno: una compra no es del futuro, una cuenta de cobro sí puede).
  */
 export function ElegirDia({
   dia,
@@ -31,6 +32,7 @@ export function ElegirDia({
   resaltado = false,
   grande = false,
   diasAtras = DIAS_ATRAS_PERMITIDOS,
+  diasAdelante = 0,
   className = '',
 }: {
   dia: string
@@ -42,6 +44,7 @@ export function ElegirDia({
   resaltado?: boolean
   grande?: boolean
   diasAtras?: number
+  diasAdelante?: number
   className?: string
 }) {
   const [abierto, setAbierto] = useState(false)
@@ -68,7 +71,7 @@ export function ElegirDia({
         </svg>
         <span className="min-w-0 flex-1 leading-tight">{mayuscula(nombreCompletoDelDia(dia, hoy))}</span>
       </button>
-      {abierto && <Calendario dia={dia} hoy={hoy} diasAtras={diasAtras} titulo={etiqueta} onElegir={elegir} onCerrar={() => setAbierto(false)} />}
+      {abierto && <Calendario dia={dia} hoy={hoy} diasAtras={diasAtras} diasAdelante={diasAdelante} titulo={etiqueta} onElegir={elegir} onCerrar={() => setAbierto(false)} />}
     </>
   )
 }
@@ -78,6 +81,7 @@ export function Calendario({
   dia,
   hoy,
   diasAtras,
+  diasAdelante = 0,
   titulo,
   onElegir,
   onCerrar,
@@ -85,14 +89,16 @@ export function Calendario({
   dia: string
   hoy: string
   diasAtras: number
+  diasAdelante?: number
   titulo: string
   onElegir: (dia: string) => void
   onCerrar: () => void
 }) {
   const minimo = sumarDias(hoy, -diasAtras)
+  const maximo = sumarDias(hoy, diasAdelante)
   const [mes, setMes] = useState(mesDe(dia))
   const hayAnterior = sumarMeses(mes, -1) >= mesDe(minimo)
-  const haySiguiente = sumarMeses(mes, 1) <= mesDe(hoy)
+  const haySiguiente = sumarMeses(mes, 1) <= mesDe(maximo)
 
   // Al abrir, el foco entra al calendario; al cerrar, vuelve al botón que lo abrió.
   const caja = useRef<HTMLDivElement>(null)
@@ -200,7 +206,7 @@ export function Calendario({
             .flat()
             .map((d, i) => {
               if (d === null) return <span key={`hueco-${i}`} />
-              const permitido = d >= minimo && d <= hoy
+              const permitido = d >= minimo && d <= maximo
               const elegido = d === dia
               return (
                 <button

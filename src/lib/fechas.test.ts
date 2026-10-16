@@ -4,6 +4,7 @@ import {
   fechaDeTabla,
   hoyBogota,
   inicioDeQuincenas,
+  nombreCompletoDelDia,
   nombreDeQuincena,
   nombreDelMes,
   quincenaDe,
@@ -71,5 +72,17 @@ describe('fechas de documentos', () => {
     expect(fechaDeDocumento('2026-09-14')).toBe('14 de Septiembre de 2026')
     expect(fechaDeTabla('2026-08-02')).toBe('Ago-02')
     expect(fechaDeTabla('2026-09-01')).toBe('Sept-01')
+  })
+})
+
+describe('nombreCompletoDelDia', () => {
+  it('nombra hoy, ayer y antier con la fecha, y los demás días solo con la fecha', () => {
+    expect(nombreCompletoDelDia('2026-10-16', '2026-10-16')).toBe('Hoy, viernes 16 de octubre')
+    expect(nombreCompletoDelDia('2026-10-15', '2026-10-16')).toBe('Ayer, jueves 15 de octubre')
+    expect(nombreCompletoDelDia('2026-10-01', '2026-10-16')).toBe('jueves 1 de octubre')
+  })
+
+  it('un día que todavía no llega sale una sola vez, sin repetirse', () => {
+    expect(nombreCompletoDelDia('2026-10-20', '2026-10-16')).toBe('martes 20 de octubre')
   })
 })
